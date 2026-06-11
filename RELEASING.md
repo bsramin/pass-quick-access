@@ -15,12 +15,14 @@ valid in `CFBundleShortVersionString`.
 1. Bump `MARKETING_VERSION` in `project.yml` if you want a new app version, and
    move the entries under `## [Unreleased]` in `CHANGELOG.md` into a section
    headed by the new tag.
-2. Commit, then tag: `git tag v2026-06-11.1 && git push --tags` (use today's
-   date, next sequence number).
+2. Commit and push.
+3. On GitHub, draft a new Release. Create a tag for it with today's date and the
+   next sequence number (for example `v2026-06-11.1`), target `main`, and paste
+   the changelog entries as the notes. Publishing it creates the tag.
 
-Pushing the tag triggers the `Release` workflow, which builds the artifact and
-creates a GitHub Release with the changelog notes for that tag attached. To
-build the zip locally instead:
+Publishing the Release triggers the `Release` workflow, which builds the
+artifact and attaches `PassQuickAccess.zip` to that same Release. To build the
+zip locally instead:
 
 ```sh
 ./scripts/build-release.sh

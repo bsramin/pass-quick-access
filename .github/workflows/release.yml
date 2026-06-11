@@ -1,8 +1,8 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
 
 permissions:
   contents: write
@@ -19,23 +19,8 @@ jobs:
       - name: Build release artifact
         run: ./scripts/build-release.sh
 
-      - name: Extract changelog notes
-        id: notes
-        run: |
-          awk -v tag="$GITHUB_REF_NAME" '
-            $0 ~ "^## \\[?" tag "\\]?" { found = 1; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md > notes.md
-          if [ ! -s notes.md ]; then
-            echo "Ad-hoc signed, not notarized. See RELEASING.md to install." > notes.md
-          fi
-
-      - name: Create GitHub Release
+      - name: Attach artifact to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --notes-file notes.md \
-            dist/PassQuickAccess.zip
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/PassQuickAccess.zip --clobber

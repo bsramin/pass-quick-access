@@ -1,0 +1,21 @@
+# Xcode / build
+build/
+/dist/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+!default.xcworkspace
+xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Notarization / signing
+*.p12
+*.provisionprofile
+/Config/Local.xcconfig

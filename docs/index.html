@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pass Quick Access — native quick access for Proton Pass on macOS</title>
+<meta name="description" content="A native macOS quick-access window for Proton Pass. Press a hotkey from any app, search your logins, copy a username, password or one-time code, or open the site. Keyboard-driven. Secrets never persisted.">
+<link rel="icon" type="image/png" href="icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pass Quick Access for macOS">
+<meta property="og:description" content="Press a hotkey from any app, search your Proton Pass logins, copy a username, password or one-time code. Native. Keyboard-driven. Secrets never persisted.">
+<meta property="og:image" content="https://bsramin.github.io/pass-quick-access/icon-1024.png">
+<meta property="og:url" content="https://bsramin.github.io/pass-quick-access/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3f1ea;
+  --panel:#fbfaf6;
+  --ink:#17161b;
+  --ink-soft:#56545d;
+  --ink-dim:#8b8990;
+  --line:#d8d4c8;
+  --line-2:#c4bfae;
+  --accent:#3f2ce0;          /* flat indigo-violet, used sparingly */
+  --accent-ink:#2a1cb0;
+  --mac-blue:#0a6cff;        /* the app's real selection colour */
+  --maxw:1080px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Schibsted Grotesk",-apple-system,sans-serif;
+  font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 26px}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-weight:700;letter-spacing:-.02em;line-height:1.04;margin:0}
+.mono{font-family:"JetBrains Mono",monospace}
+img{max-width:100%}
+
+kbd{
+  font-family:"JetBrains Mono",monospace;font-size:.8em;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:1.85em;height:1.85em;padding:0 .45em;
+  background:var(--panel);border:1px solid var(--line-2);border-radius:5px;color:var(--ink);
+}
+
+/* ---- nav ---- */
+nav{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;gap:14px;height:62px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;font-size:17px}
+.brand img{width:26px;height:26px;border-radius:6px;border:1px solid var(--line-2)}
+.nav-links{margin-left:auto;display:flex;align-items:center;gap:4px}
+.nav-links a.txt{color:var(--ink-soft);padding:8px 12px;font-size:15px;transition:color .15s}
+.nav-links a.txt:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;
+  padding:9px 17px;border-radius:8px;transition:.15s;border:1.5px solid var(--ink);cursor:pointer;font-family:inherit}
+.btn-primary{background:var(--ink);color:var(--paper)}
+.btn-primary:hover{background:var(--accent);border-color:var(--accent)}
+.btn-ghost{background:transparent;color:var(--ink)}
+.btn-ghost:hover{background:var(--ink);color:var(--paper)}
+.nav-links .btn-ghost{display:none}
+@media(min-width:780px){.nav-links .btn-ghost{display:inline-flex}}
+
+/* ---- hero ---- */
+.hero{display:grid;gap:46px;align-items:center;padding:72px 0 60px;border-bottom:1px solid var(--line)}
+@media(min-width:960px){.hero{grid-template-columns:1.05fr 1fr;padding:92px 0 80px}}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:"JetBrains Mono",monospace;
+  font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+h1.title{font-size:clamp(40px,6.6vw,66px);font-weight:800;margin:20px 0 0;letter-spacing:-.035em}
+.title em{font-style:normal;color:var(--accent)}
+.lede{font-size:19px;color:var(--ink-soft);margin:24px 0 0;max-width:32em}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:30px}
+.hotkey-note{display:flex;align-items:center;gap:9px;color:var(--ink-dim);font-size:14px;margin-top:26px}
+.hotkey-note .keys{display:inline-flex;gap:5px}
+.trust-row{display:flex;flex-wrap:wrap;gap:10px 24px;margin-top:28px;color:var(--ink-soft);font-size:14px}
+.trust-row span{display:inline-flex;align-items:center;gap:8px}
+.trust-row svg{flex:none;color:var(--accent)}
+
+/* ---- palette demo (flat) ---- */
+.demo-stage{position:relative}
+.palette{
+  position:relative;border:1.5px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff;color:#1d1d22;
+}
+.palette-search{display:flex;align-items:center;gap:11px;padding:15px 17px;border-bottom:1px solid #e7e5df}
+.palette-search svg{color:#86868b;flex:none}
+#paletteInput{border:0;outline:0;background:transparent;font-size:18px;font-family:inherit;color:#1d1d22;width:100%}
+#paletteInput::placeholder{color:#9a9aa2}
+.palette-list{max-height:330px;overflow:auto;padding:7px}
+.prow{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:7px;cursor:pointer}
+.prow .mono-ico{width:32px;height:32px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:700;font-size:14px}
+.prow .pmeta{min-width:0}
+.prow .ptitle{font-weight:600;font-size:15px;line-height:1.2}
+.prow .psub{font-size:13px;color:#86868b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .ptag{margin-left:auto;font-size:11.5px;color:#6b6b73;background:#efeee9;padding:3px 9px;border-radius:5px;flex:none}
+.prow.sel{background:var(--mac-blue);color:#fff}
+.prow.sel .psub{color:rgba(255,255,255,.82)}
+.prow.sel .ptag{background:rgba(255,255,255,.22);color:#fff}
+.palette-foot{display:flex;align-items:center;gap:15px;padding:10px 15px;border-top:1px solid #e7e5df;
+  font-size:12px;color:#6b6b73;font-family:"JetBrains Mono",monospace}
+.palette-foot .fk{display:inline-flex;align-items:center;gap:6px}
+.palette-foot kbd{min-width:1.6em;height:1.6em;background:#f4f3ee;border:1px solid #d8d6cf;color:#3a3a42}
+.palette-foot .right{margin-left:auto}
+.demo-cap{margin-top:14px;font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-dim);text-align:center}
+.toast{position:absolute;left:50%;bottom:16px;transform:translate(-50%,12px);
+  background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;
+  opacity:0;pointer-events:none;transition:.22s;display:flex;align-items:center;gap:8px}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast .tdot{width:7px;height:7px;border-radius:50%;background:#46d27e}
+
+/* ---- section scaffold ---- */
+section{border-bottom:1px solid var(--line)}
+.sec-pad{padding:66px 0}
+.sec-head{display:grid;gap:6px;margin-bottom:42px;max-width:44rem}
+.sec-num{font-family:"JetBrains Mono",monospace;font-size:12.5px;letter-spacing:.1em;color:var(--accent)}
+.sec-head h2{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-.03em}
+.sec-head p{color:var(--ink-soft);font-size:18px;margin:10px 0 0}
+
+/* ---- feature grid (flat, ruled) ---- */
+.grid{display:grid;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+@media(min-width:680px){.grid{grid-template-columns:1fr 1fr}}
+@media(min-width:980px){.grid{grid-template-columns:1fr 1fr 1fr}}
+.card{padding:26px 24px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);transition:background .15s}
+.card:hover{background:#fff}
+.card .ic{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--accent);margin-bottom:15px}
+.card h3{font-size:18px;font-weight:700}
+.card p{color:var(--ink-soft);font-size:15px;margin:8px 0 0}
+@media(min-width:680px){
+  .grid-feat .card.span2{grid-column:span 2}
+  .grid-feat .card:nth-child(2n){border-right:0}
+}
+@media(min-width:980px){
+  .grid-feat .card:nth-child(2n){border-right:1px solid var(--line)}
+  .grid-feat .card.span2{grid-column:span 1}
+  .grid-feat .card:nth-child(3n){border-right:0}
+}
+
+/* ---- security ---- */
+.shield-list{display:grid;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+@media(min-width:720px){.shield-list{grid-template-columns:1fr 1fr}}
+.shield{display:flex;gap:14px;padding:24px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+@media(min-width:720px){.shield:nth-child(2n){border-right:0}}
+.shield .chk{flex:none;width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.shield b{font-weight:700;font-size:16px}
+.shield p{color:var(--ink-soft);font-size:14.5px;margin:6px 0 0}
+
+/* ---- how it works ---- */
+.flow{display:grid;gap:0;max-width:720px;margin:0 auto;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.flow-node{padding:22px 24px;border-bottom:1px solid var(--line)}
+.flow-node:last-child{border-bottom:0}
+.flow-node h3{font-size:17px;font-weight:700;display:flex;align-items:center;gap:11px}
+.flow-node .layer{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--accent);
+  border:1px solid var(--line-2);padding:2px 7px;border-radius:5px}
+.flow-node p{color:var(--ink-soft);font-size:15px;margin:7px 0 0}
+.flow-edge{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-dim);
+  padding:9px 24px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.015)}
+
+/* ---- keyboard ---- */
+.keys-wrap{display:grid;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+@media(min-width:560px){.keys-wrap{grid-template-columns:1fr 1fr}}
+@media(min-width:900px){.keys-wrap{grid-template-columns:1fr 1fr 1fr}}
+.keyrow{display:flex;align-items:center;gap:13px;padding:17px 20px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.keyrow .kc{display:inline-flex;gap:5px;flex:none}
+.keyrow span{color:var(--ink-soft);font-size:15px}
+
+/* ---- screenshots ---- */
+.shots{display:grid;gap:18px;grid-template-columns:1fr}
+@media(min-width:720px){.shots{grid-template-columns:1.12fr .88fr}}
+.shot{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);position:relative}
+.shot img{display:block;width:100%;height:auto}
+.shot figcaption{position:absolute;left:12px;bottom:11px;font-family:"JetBrains Mono",monospace;font-size:11.5px;
+  color:var(--ink);background:rgba(251,250,246,.92);padding:4px 10px;border-radius:6px;border:1px solid var(--line-2)}
+
+/* ---- get / final ---- */
+.get-grid{display:grid;gap:40px;align-items:start}
+@media(min-width:860px){.get-grid{grid-template-columns:.85fr 1.15fr}}
+.req{list-style:none;margin:18px 0 0;padding:0}
+.req li{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);color:var(--ink-soft);font-size:15.5px}
+.req li svg{flex:none;color:var(--accent);margin-top:3px}
+.install{border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;font-family:"JetBrains Mono",monospace;font-size:13px;background:#fff}
+.install .ihead{display:flex;align-items:center;gap:7px;padding:10px 14px;border-bottom:1px solid #e7e5df;color:var(--ink-dim);font-size:11.5px}
+.install .dotmac{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.12)}
+.install pre{margin:0;padding:17px 18px;overflow:auto;color:#2a2a32;line-height:1.95}
+.install .c{color:#9a9aa2}
+.install .g{color:var(--accent)}
+.note{font-size:14px;color:var(--ink-dim);margin-top:20px}
+
+/* ---- footer ---- */
+footer{padding:50px 0 38px}
+.foot-grid{display:flex;flex-wrap:wrap;gap:30px;justify-content:space-between;align-items:flex-start}
+.foot-grid .lead{max-width:23rem}
+.foot-grid .lead p{color:var(--ink-soft);font-size:14.5px;margin-top:12px}
+.foot-cols{display:flex;flex-wrap:wrap;gap:44px}
+.foot-col h4{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-dim);margin:0 0 12px;font-family:"JetBrains Mono",monospace;font-weight:600}
+.foot-col a{display:block;color:var(--ink-soft);font-size:15px;padding:4px 0;transition:color .15s}
+.foot-col a:hover{color:var(--accent)}
+.foot-bottom{margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;color:var(--ink-dim);font-size:13px}
+
+/* ---- reveal ---- */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+.reveal.in{opacity:1;transform:none}
+[data-stagger]>*{opacity:0;transform:translateY(12px);animation:rise .55s ease forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  .reveal,[data-stagger]>*{opacity:1;transform:none;animation:none;transition:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><img src="icon.png" alt="">Pass Quick Access</a>
+    <div class="nav-links">
+      <a class="txt" href="#features">Features</a>
+      <a class="txt" href="#security">Security</a>
+      <a class="txt" href="#how">How it works</a>
+      <a class="btn btn-ghost" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn btn-primary" href="#get">Get it</a>
+    </div>
+  </div>
+</nav>
+
+<header id="top" class="wrap hero">
+  <div data-stagger>
+    <div class="eyebrow" style="animation-delay:.02s"><span class="dot"></span>Native macOS · for Proton Pass</div>
+    <h1 class="title" style="animation-delay:.08s">Your logins,<br>one keystroke <em>away.</em></h1>
+    <p class="lede" style="animation-delay:.16s">A native quick-access window for Proton Pass. Summon it over any app, search, and copy a username, password or one-time code — without ever opening the Electron app.</p>
+    <div class="cta-row" style="animation-delay:.24s">
+      <a class="btn btn-primary" href="#get">Build &amp; run <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn btn-ghost" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+    <div class="hotkey-note" style="animation-delay:.32s">
+      Default hotkey <span class="keys"><kbd>⌥</kbd><kbd>⇧</kbd><kbd>Space</kbd></span> — fully configurable
+    </div>
+    <div class="trust-row" style="animation-delay:.4s">
+      <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>Secrets never stored</span>
+      <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5a2 2 0 0 1 2-2h2M16 3h2a2 2 0 0 1 2 2v2M20 17v2a2 2 0 0 1-2 2h-2M8 21H6a2 2 0 0 1-2-2v-2"/></svg>Keyboard-first</span>
+      <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>Open source · GPLv3</span>
+    </div>
+  </div>
+
+  <div class="demo-stage reveal">
+    <div class="palette" id="palette">
+      <div class="palette-search">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="paletteInput" type="text" placeholder="Search your logins…" autocomplete="off" spellcheck="false" aria-label="Demo search">
+      </div>
+      <div class="palette-list" id="paletteList"></div>
+      <div class="palette-foot">
+        <span class="fk"><kbd>↩</kbd> Open</span>
+        <span class="fk"><kbd>⌘</kbd><kbd>C</kbd> Password</span>
+        <span class="fk"><kbd>↑</kbd><kbd>↓</kbd> Move</span>
+        <span class="right fk"><kbd>esc</kbd> Close</span>
+      </div>
+      <div class="toast" id="toast"><span class="tdot"></span><span id="toastText">Password copied</span></div>
+    </div>
+    <div class="demo-cap">↑ a live, interactive replica — type and press ↵</div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">01 — Features</div>
+      <h2>Built for muscle memory.</h2>
+      <p>Everything happens from the keyboard, over whatever you're working in. No window switching, no waiting for an Electron app to wake up.</p>
+    </div>
+    <div class="grid grid-feat reveal">
+      <div class="card span2">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+        <h3>Search that matches Proton Pass</h3>
+        <p>The same substring, diacritic-insensitive, multi-word matching as the official client — across titles, usernames, emails, URLs, notes and custom fields. Ordered by most recently modified or alphabetically.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
+        <h3>Copy what you need</h3>
+        <p>Username, password, or one-time code — each shown only when the item actually has that field.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></div>
+        <h3>Open in browser</h3>
+        <p>Jump straight to the item's site, with a chooser when an item has several URLs.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 11V7a4 4 0 1 1 8 0M5 11h14a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a1 1 0 0 1 1-1Z"/></svg></div>
+        <h3>Optional Touch ID lock</h3>
+        <p>Guard casual access with Touch ID and a configurable timeout, falling back to your Mac password.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 5 4-12 2 7h6"/></svg></div>
+        <h3>Resume where you left off</h3>
+        <p>Reopen within 30 seconds and land back on the same item, to grab another field.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></div>
+        <h3>Private by default</h3>
+        <p>Items show a locally generated monogram. Opt in to favicons with a clear notice — never fetched for local or private addresses.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">02 — Security model</div>
+      <h2>It's a password tool. So it earns the trust.</h2>
+      <p>The app never reimplements Proton's crypto or auth. It drives the official, Proton-maintained <a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> and is careful never to be the weaker link.</p>
+    </div>
+    <div class="shield-list reveal">
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Secrets are never persisted or indexed</b><p>The in-memory index holds only titles, URLs, usernames and whether a password or code exists — never the values.</p></div></div>
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Read fresh, cleared fast</b><p>Passwords and codes are read from pass-cli at the moment you copy, marked concealed on the pasteboard, and cleared after 30 seconds.</p></div></div>
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Authentication lives in pass-cli</b><p>The app holds no Proton credentials and relies entirely on the CLI's existing session.</p></div></div>
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Hardened runtime</b><p>Signed release builds use the hardened runtime without <span class="mono">get-task-allow</span>, so other processes can't attach. Nothing is written to disk.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal" style="margin-left:auto;margin-right:auto;text-align:center">
+      <div class="sec-num">03 — How it works</div>
+      <h2>A thin, native shell over the official CLI.</h2>
+    </div>
+    <div class="flow reveal">
+      <div class="flow-node">
+        <h3><span class="layer">UI</span>Floating panel · AppKit NSPanel + SwiftUI</h3>
+        <p>hotkey ▸ search ▸ pick ▸ copy / open. Opens over any app and dismisses when it loses focus.</p>
+      </div>
+      <div class="flow-edge">↓ metadata only — titles, URLs, usernames</div>
+      <div class="flow-node">
+        <h3><span class="layer">CORE</span>PassCLIClient · an actor over pass-cli</h3>
+        <p>vault list · item list · item view. Secrets are fetched just-in-time and never cached.</p>
+      </div>
+      <div class="flow-edge">↓ secrets fetched on demand</div>
+      <div class="flow-node">
+        <h3><span class="layer">CLI</span>pass-cli ▸ Proton Pass servers</h3>
+        <p>The Proton-maintained client handles all authentication and cryptography.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">04 — Keyboard</div>
+      <h2>Hands stay home.</h2>
+    </div>
+    <div class="keys-wrap reveal">
+      <div class="keyrow"><span class="kc"><kbd>↑</kbd><kbd>↓</kbd></span><span>Move through results</span></div>
+      <div class="keyrow"><span class="kc"><kbd>⇞</kbd><kbd>⇟</kbd></span><span>Jump by page</span></div>
+      <div class="keyrow"><span class="kc"><kbd>↖</kbd><kbd>↘</kbd></span><span>Home &amp; End</span></div>
+      <div class="keyrow"><span class="kc"><kbd>→</kbd></span><span>Open an item</span></div>
+      <div class="keyrow"><span class="kc"><kbd>←</kbd></span><span>Step back</span></div>
+      <div class="keyrow"><span class="kc"><kbd>esc</kbd></span><span>Close the panel</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">05 — Screenshots</div>
+      <h2>Native, down to the pixel.</h2>
+    </div>
+    <div class="shots reveal">
+      <figure class="shot"><img src="screenshots/search.png" alt="Quick-access search panel" loading="lazy"><figcaption>search panel</figcaption></figure>
+      <figure class="shot"><img src="screenshots/settings.png" alt="Settings window" loading="lazy"><figcaption>settings</figcaption></figure>
+    </div>
+    <div class="shots reveal" style="margin-top:18px;grid-template-columns:1fr">
+      <figure class="shot"><img src="screenshots/detail.png" alt="Item detail view with copy actions" loading="lazy"><figcaption>item detail</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="get">
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">06 — Get it</div>
+      <h2>Get it running.</h2>
+    </div>
+    <div class="get-grid">
+      <div class="reveal">
+        <p style="color:var(--ink-soft);font-size:16px;margin:0">Distribution is build-from-source today. You'll need:</p>
+        <ul class="req">
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg>macOS 14 or later</li>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg><span><a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> installed and logged in</span></li>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg><span><a class="mono" style="color:var(--accent)" href="https://github.com/yonaskolb/XcodeGen" target="_blank" rel="noopener">XcodeGen</a> to generate the project</span></li>
+        </ul>
+        <p class="note">A notarized release needs an Apple Developer ID certificate. <a style="color:var(--accent)" href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsoring</a> helps cover it, so builds open without a Gatekeeper prompt.</p>
+      </div>
+      <div class="install reveal">
+        <div class="ihead">
+          <span class="dotmac" style="background:#ff5f57"></span><span class="dotmac" style="background:#febc2e"></span><span class="dotmac" style="background:#28c840"></span>
+          <span style="margin-left:8px">Terminal</span>
+        </div>
+        <pre><span class="c"># clone &amp; build</span>
+git clone https://github.com/bsramin/pass-quick-access
+<span class="g">cd</span> pass-quick-access
+xcodegen generate
+xcodebuild -scheme PassQuickAccess \
+  -destination <span class="g">'platform=macOS'</span> \
+  -derivedDataPath build build
+<span class="g">open</span> build/Build/Products/Debug/PassQuickAccess.app</pre>
+      </div>
+    </div>
+    <div class="cta-row reveal" style="margin-top:34px">
+      <a class="btn btn-primary" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsor the project</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="lead">
+        <a class="brand" href="#top"><img src="icon.png" alt="" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line-2)">Pass Quick Access</a>
+        <p>Native macOS quick access for Proton Pass, built on the official pass-cli.</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>Project</h4>
+          <a href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/bsramin/pass-quick-access/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+          <a href="https://github.com/bsramin/pass-quick-access/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+          <a href="https://github.com/bsramin/pass-quick-access/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+        </div>
+        <div class="foot-col">
+          <h4>Related</h4>
+          <a href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a>
+          <a href="https://proton.me/pass" target="_blank" rel="noopener">Proton Pass</a>
+          <a href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsor</a>
+          <a href="https://github.com/bsramin/pass-quick-access/blob/main/LICENSE" target="_blank" rel="noopener">License · GPLv3</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span style="max-width:46em">Not affiliated with or endorsed by Proton AG. Proton Pass is a trademark of Proton AG.</span>
+      <span>© 2026 · GPL-3.0</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var items=[
+    {t:"X",s:"lukasbecker",c:"#15151a",g:"Personal"},
+    {t:"PayPal",s:"lukas.becker@example.com",c:"#1546a0",g:"Personal"},
+    {t:"Dropbox",s:"lukas.becker@example.com",c:"#0061ff",g:"Personal"},
+    {t:"LinkedIn",s:"lukas.becker@example.com",c:"#0a66c2",g:"Personal"},
+    {t:"Facebook",s:"lukas.becker@example.com",c:"#1877f2",g:"Personal"},
+    {t:"Netflix",s:"lukas.becker@example.com",c:"#b1060f",g:"Personal"},
+    {t:"Amazon",s:"lukas.becker@example.com",c:"#e47911",g:"Personal"},
+    {t:"GitHub",s:"lukasbecker",c:"#1c2128",g:"Work"},
+    {t:"Google",s:"lukas.becker@example.com",c:"#4285f4",g:"Personal"},
+    {t:"Stripe",s:"lukas@example.com",c:"#635bff",g:"Work"},
+    {t:"Notion",s:"lukas.becker@example.com",c:"#2f2f2f",g:"Work"}
+  ];
+  var input=document.getElementById('paletteInput');
+  var list=document.getElementById('paletteList');
+  var toast=document.getElementById('toast');
+  var toastText=document.getElementById('toastText');
+  var sel=0, view=items.slice(), toastTimer;
+
+  function norm(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+  function render(){
+    list.innerHTML='';
+    if(!view.length){
+      list.innerHTML='<div style="padding:24px 12px;text-align:center;color:#9a9aa2;font-size:14px">No matches</div>';
+      return;
+    }
+    view.forEach(function(it,i){
+      var row=document.createElement('div');
+      row.className='prow'+(i===sel?' sel':'');
+      row.innerHTML='<div class="mono-ico" style="background:'+it.c+'">'+it.t.charAt(0)+'</div>'+
+        '<div class="pmeta"><div class="ptitle">'+it.t+'</div><div class="psub">'+it.s+'</div></div>'+
+        '<div class="ptag">'+it.g+'</div>';
+      row.addEventListener('click',function(){sel=i;render();fire();});
+      list.appendChild(row);
+    });
+    var s=list.children[sel];
+    if(s&&s.scrollIntoView) s.scrollIntoView({block:'nearest'});
+  }
+  function filter(){
+    var q=norm(input.value.trim());
+    view=q?items.filter(function(it){return norm(it.t).indexOf(q)>-1||norm(it.s).indexOf(q)>-1}):items.slice();
+    sel=0;render();
+  }
+  function fire(){
+    var it=view[sel];if(!it)return;
+    toastText.textContent='Password for '+it.t+' copied';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){toast.classList.remove('show')},2200);
+  }
+  input.addEventListener('input',filter);
+  input.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){e.preventDefault();sel=(sel+1)%view.length;render();}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=(sel-1+view.length)%view.length;render();}
+    else if(e.key==='Enter'){e.preventDefault();fire();}
+    else if(e.key==='Escape'){input.value='';filter();input.blur();}
+  });
+  render();
+
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);}});
+  },{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+})();
+</script>
+</body>
+</html>

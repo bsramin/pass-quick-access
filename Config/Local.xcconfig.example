@@ -1,0 +1,6 @@
+// Copy this file to Config/Local.xcconfig (git-ignored) to sign with your own
+// Apple Developer identity instead of ad-hoc. Find your team ID in the Apple
+// Developer portal or in Xcode's Accounts settings.
+DEVELOPMENT_TEAM = YOURTEAMID
+CODE_SIGN_IDENTITY = Apple Development
+CODE_SIGN_STYLE = Manual

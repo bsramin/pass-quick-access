@@ -1,0 +1,8 @@
+// Default to ad-hoc signing so the project builds with no Apple Developer
+// account, which is enough for development, the tests and CI. To sign with your
+// own identity, copy Local.xcconfig.example to Local.xcconfig (git-ignored) and
+// fill it in; the values there override the ones below.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+
+#include? "Local.xcconfig"

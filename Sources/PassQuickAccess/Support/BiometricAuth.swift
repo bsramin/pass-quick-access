@@ -6,10 +6,21 @@ import LocalAuthentication
 /// quick-access panel.
 @MainActor
 enum BiometricAuth {
-    static func authenticate(reason: String) async -> Bool {
+    /// Prompts for Touch ID (with a password fallback). If `timeout` is given and
+    /// the user neither approves nor cancels within it, the prompt is dismissed
+    /// and the result is `false` (treated as a denial).
+    static func authenticate(reason: String, timeout: Duration? = nil) async -> Bool {
         let context = LAContext()
-        context.localizedCancelTitle = "Cancel"
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return false }
+
+        let timeoutTask: Task<Void, Never>? = timeout.map { limit in
+            Task {
+                try? await Task.sleep(for: limit)
+                if !Task.isCancelled { context.invalidate() }
+            }
+        }
+        defer { timeoutTask?.cancel() }
+
         do {
             return try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
         } catch {

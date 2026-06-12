@@ -1,5 +1,13 @@
 # Changelog
 
+## v2026-06-12.1
+
+### Added
+- Optional SSH agent: serves your Proton Pass SSH keys to `git` and `ssh` and
+  asks for Touch ID before every signature, showing which app is requesting it.
+  It proxies the official `pass-cli` agent, so private keys stay inside the CLI
+  and never reach this app. Off by default; enable it under Settings → SSH.
+
 ## v2026-06-11.1
 
 ### Added

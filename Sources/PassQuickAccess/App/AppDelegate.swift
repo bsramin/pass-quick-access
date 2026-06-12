@@ -8,6 +8,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var controller: QuickAccessController?
+    private var agentController: AgentProxyController?
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,6 +25,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.registerHotkey()
         controller.preloadIndexIfUnlocked()
         self.controller = controller
+
+        let agent = AgentProxyController(executable: executable)
+        self.agentController = agent
+        if UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled) {
+            Task { await agent.start() }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        agentController?.stop()
     }
 
     private func installStatusItem() {
@@ -93,13 +104,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeSettingsWindow() -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "Settings"
-        window.contentView = NSHostingView(rootView: SettingsView())
+        window.contentView = NSHostingView(rootView: SettingsView(agentController: agentController))
         window.isReleasedWhenClosed = false
         window.center()
         return window

@@ -68,6 +68,62 @@ Proton-maintained command-line client, and wraps it in a native macOS UI.
   Favicons are never fetched for local or private addresses, including hostnames
   that resolve to one, so the feature stays off your local network.
 
+## SSH agent
+
+An optional SSH agent serves your Proton Pass SSH keys to `git` and `ssh`, the
+way 1Password's does, and asks for Touch ID before every signature, naming the
+app that requested it. It is off by default; turn it on under **Settings → SSH**.
+
+![SSH key signature request with Touch ID](docs/screenshots/ssh-agent.png)
+
+It does not hold keys or sign anything itself. `pass-cli` already ships an SSH
+agent that stores the keys and does the signing; this app runs a thin **proxy**
+in front of it that adds the native confirmation. Private keys never enter the
+app, consistent with the security model below. Repeated signatures within a few
+seconds aren't re-prompted, you can mark an app trusted so it stops asking, and
+non-interactive `BatchMode` probes are denied without a prompt.
+
+### Setting it up
+
+1. **Store an SSH key in Proton Pass.** SSH keys live under *Custom item* (the
+   "Other" type) in the Proton Pass apps. `pass-cli ssh-agent debug --vault-name
+   <name>` lists which of your items are usable as SSH keys.
+2. **Enable the agent** in *Settings → SSH*. The app starts the upstream
+   `pass-cli` agent for you (it fetches your keys from Proton, so the status
+   reaches *Running* after a few seconds).
+3. **Point SSH at the proxy.** Flip on *Configure ~/.ssh/config automatically* and
+   the app writes the entry for you (and removes it when you turn it back off):
+   ```
+   Host *
+       IdentityAgent ~/.ssh/pass-quick-access-agent.sock
+   ```
+   For most people that's all you need: `ssh` and `git` read `~/.ssh/config`. Some
+   tools ignore it and only look at the `SSH_AUTH_SOCK` environment variable
+   (`ssh-add`, some GUI clients, certain scripts). If you use those, also enable
+   *Set SSH_AUTH_SOCK for new programs*: it publishes the proxy socket to your
+   login session via `launchctl`, so they pick it up too. It applies to programs
+   launched afterwards, so quit and reopen a terminal (or app) for it to take
+   effect.
+4. **Use `git` and `ssh` normally.** Each signature pops a Touch ID prompt naming
+   the app and key. Check the keys are served with:
+   ```sh
+   SSH_AUTH_SOCK=~/.ssh/pass-quick-access-agent.sock ssh-add -l
+   ```
+
+### Migrating from 1Password
+
+The workflow is the same one you already know:
+
+- Move (or recreate) your SSH keys as Proton Pass items, and register the public
+  keys with your servers / GitHub as usual.
+- Let the app write its `~/.ssh/config` entry (step 3 above), then **remove
+  1Password's own `IdentityAgent` line** and turn off its SSH agent. The app only
+  manages its own block, so anything another tool added is yours to clean up.
+- **Gotcha shared by every agent:** an explicit on-disk `IdentityFile` for a host
+  takes precedence over the agent, so `ssh` uses the file (and prompts for its
+  passphrase) instead of asking the agent. Remove the `IdentityFile` lines for
+  the hosts you want served from Proton Pass.
+
 ## Security model
 
 - **Secrets are never persisted or indexed.** The in-memory index holds only

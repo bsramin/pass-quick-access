@@ -4,6 +4,10 @@ import KeyboardShortcuts
 import SwiftUI
 
 struct SettingsView: View {
+    /// The SSH proxy controller, or `nil` when pass-cli wasn't found so the
+    /// agent can't run. The General tab still works either way.
+    var agentController: AgentProxyController?
+
     @AppStorage(SettingKey.loadWebsiteIcons) private var loadWebsiteIcons = false
     @AppStorage(SettingKey.requireAuth) private var requireAuth = false
     @AppStorage(SettingKey.authTimeout) private var authTimeout = AuthTimeout.fiveMinutes.rawValue
@@ -13,6 +17,29 @@ struct SettingsView: View {
     @State private var revertingAuth = false
 
     var body: some View {
+        TabView {
+            general
+                .tabItem { Label("General", systemImage: "gearshape") }
+            ssh
+                .tabItem { Label("SSH Agent", systemImage: "key.horizontal") }
+        }
+        .frame(width: 480, height: 640)
+    }
+
+    @ViewBuilder
+    private var ssh: some View {
+        if let agentController {
+            SSHSettingsView(controller: agentController)
+        } else {
+            ContentUnavailableView(
+                "pass-cli not found",
+                systemImage: "key.horizontal",
+                description: Text("Install pass-cli and relaunch to use the SSH agent.")
+            )
+        }
+    }
+
+    private var general: some View {
         Form {
             Section {
                 KeyboardShortcuts.Recorder("Open Quick Access", name: .toggleQuickAccess)
@@ -56,7 +83,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 640)
         .onChange(of: requireAuth) { previous, _ in
             if revertingAuth { revertingAuth = false; return }
             Task {

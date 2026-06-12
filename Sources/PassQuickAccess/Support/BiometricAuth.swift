@@ -10,19 +10,19 @@ enum BiometricAuth {
     /// the user neither approves nor cancels within it, the prompt is dismissed
     /// and the result is `false` (treated as a denial).
     static func authenticate(reason: String, timeout: Duration? = nil) async -> Bool {
-        let context = LAContext()
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return false }
+        let auth = BiometricContext()
+        guard auth.canEvaluate(.deviceOwnerAuthentication) else { return false }
 
         let timeoutTask: Task<Void, Never>? = timeout.map { limit in
             Task {
                 try? await Task.sleep(for: limit)
-                if !Task.isCancelled { context.invalidate() }
+                if !Task.isCancelled { auth.invalidate() }
             }
         }
         defer { timeoutTask?.cancel() }
 
         do {
-            return try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
+            return try await auth.evaluate(.deviceOwnerAuthentication, reason: reason)
         } catch {
             return false
         }

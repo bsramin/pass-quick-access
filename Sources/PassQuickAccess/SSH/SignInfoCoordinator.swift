@@ -22,7 +22,7 @@ final class SignInfoCoordinator {
 
     private var queue: [Pending] = []
     private var panel: NSPanel?
-    private var context: LAContext?
+    private var authContext: BiometricContext?
     private var timeoutTask: Task<Void, Never>?
     private var evaluating = false
     private var isBusy = false
@@ -41,44 +41,41 @@ final class SignInfoCoordinator {
     }
 
     private func start(_ request: SignRequest) {
-        let context = LAContext()
+        let auth = BiometricContext()
         // Embedding the prompt needs biometric hardware. On a Mac without Touch ID
         // fall back to the ordinary system prompt (which offers the password).
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else {
+        guard auth.canEvaluate(.deviceOwnerAuthenticationWithBiometrics) else {
             Task {
                 let ok = await BiometricAuth.authenticate(reason: Self.reason(for: request), timeout: Self.timeout)
                 finish(ok)
             }
             return
         }
-        self.context = context
+        self.authContext = auth
         evaluating = false
-        showCard(for: request, context: context)
+        showCard(for: request, context: auth.context)
     }
 
     /// Started from the card's `onAppear`, so the embedded `LAAuthenticationView`
     /// is in the window before the evaluation begins.
     private func evaluate() {
-        guard !evaluating, let context, let request = queue.first?.request else { return }
+        guard !evaluating, let auth = authContext, let request = queue.first?.request else { return }
         evaluating = true
 
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: Self.timeout)
             guard !Task.isCancelled else { return }
-            self?.context?.invalidate()
+            self?.authContext?.invalidate()
         }
 
         Task {
-            finish(await runEvaluation(context: context, request: request))
+            finish(await runEvaluation(auth: auth, request: request))
         }
     }
 
-    private func runEvaluation(context: LAContext, request: SignRequest) async -> Bool {
+    private func runEvaluation(auth: BiometricContext, request: SignRequest) async -> Bool {
         do {
-            return try await context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: Self.reason(for: request)
-            )
+            return try await auth.evaluate(.deviceOwnerAuthenticationWithBiometrics, reason: Self.reason(for: request))
         } catch let error as LAError where Self.biometricsUnusable(error) {
             // Touch ID is locked out or otherwise unusable. Drop the embedded card
             // and offer the system prompt, which falls back to the Mac password, so
@@ -107,14 +104,14 @@ final class SignInfoCoordinator {
     /// Denying (or timing out) cancels the in-flight evaluation, which makes
     /// `evaluatePolicy` throw and resolves the request as not approved.
     private func deny() {
-        context?.invalidate()
+        authContext?.invalidate()
     }
 
     private func finish(_ approved: Bool) {
         guard isBusy, let pending = queue.first else { return }
         timeoutTask?.cancel()
         timeoutTask = nil
-        context = nil
+        authContext = nil
         evaluating = false
         hideCard()
         queue.removeFirst()

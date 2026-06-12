@@ -11,17 +11,27 @@ import SwiftUI
 @MainActor
 final class QuickAccessController {
     private let viewModel: QuickAccessViewModel
+    private let largeType = LargeTypeWindowController()
     private var panel: QuickAccessPanel?
     private var previousApp: NSRunningApplication?
     private var anchorTopLeft: NSPoint?
     private var cancellable: AnyCancellable?
     private var lastUnlock: Date?
+    /// The app that was frontmost before a reveal, restored when the panel
+    /// reappears after the large-type window closes.
+    private var appBeforeLargeType: NSRunningApplication?
 
     private let panelWidth: CGFloat = 640
 
     init(client: PassCLIClient) {
         viewModel = QuickAccessViewModel(client: client)
         viewModel.onDismiss = { [weak self] in self?.hide() }
+        viewModel.onReveal = { [weak self] request in
+            guard let self else { return }
+            self.appBeforeLargeType = self.previousApp
+            self.largeType.show(title: request.title, field: request.field, value: request.value)
+        }
+        largeType.onClose = { [weak self] in self?.reshowAfterLargeType() }
         cancellable = viewModel.objectWillChange.sink { [weak self] in
             // objectWillChange fires before the value updates; defer so the
             // height is computed from the new state.
@@ -45,6 +55,13 @@ final class QuickAccessController {
 
     func toggle() {
         if panel?.isVisible == true { hide() } else { show() }
+    }
+
+    /// Brings the panel back on the same item after the large-type window closes,
+    /// without re-authenticating (the session was just unlocked).
+    private func reshowAfterLargeType() {
+        present(frontmost: appBeforeLargeType ?? NSWorkspace.shared.frontmostApplication)
+        appBeforeLargeType = nil
     }
 
     func show() {

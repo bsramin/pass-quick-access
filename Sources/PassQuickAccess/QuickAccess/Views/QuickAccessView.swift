@@ -68,6 +68,16 @@ struct QuickAccessView: View {
             Task { await viewModel.perform(action) }
             return .handled
         }
+        .onKeyPress(keys: ["l", "L"]) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            // Reveals the highlighted field in detail, or the password (else the
+            // username) of the selected row from the list.
+            let action: QuickAccessViewModel.ItemAction = viewModel.isShowingDetail
+                ? viewModel.actionSelection
+                : viewModel.availableActions.contains(.copyPassword) ? .copyPassword : .copyUsername
+            Task { await viewModel.reveal(action) }
+            return .handled
+        }
         .onExitCommand {
             if viewModel.isChoosingURL { viewModel.closeURLChooser() }
             else if viewModel.isShowingDetail { viewModel.closeDetail() }
@@ -256,6 +266,7 @@ struct QuickAccessView: View {
             Image(systemName: "folder")
             Text("Located in \(item.vaultName)").lineLimit(1)
             Spacer()
+            hint("⌘L", "Large type")
             hint("←", "Back")
         }
     }

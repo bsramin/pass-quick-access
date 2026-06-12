@@ -64,6 +64,15 @@ final class QuickAccessViewModel: ObservableObject {
 
     /// Invoked when an action should dismiss the panel.
     var onDismiss: (() -> Void)?
+    /// Invoked to show a field's value in the large-type window.
+    var onReveal: ((RevealRequest) -> Void)?
+
+    /// A value to display big, with the item and field it came from.
+    struct RevealRequest {
+        let title: String
+        let field: String
+        let value: String
+    }
 
     private let client: PassCLIClient
     private var index = SearchIndex(items: [])
@@ -76,6 +85,9 @@ final class QuickAccessViewModel: ObservableObject {
     private var lastActionAt: Date?
     private var resumeItem: ItemSummary?
     private let resumeWindow: TimeInterval = 30
+    /// Captured when revealing a value, so the panel can return to the same item
+    /// and field once the large-type window closes, regardless of timing.
+    private var revealResume: (item: ItemSummary, inDetail: Bool, action: ItemAction)?
 
     init(client: PassCLIClient) {
         self.client = client
@@ -239,6 +251,36 @@ final class QuickAccessViewModel: ObservableObject {
         onDismiss?()
     }
 
+    /// Reveals a field's value in the large-type window. Mirrors `perform`'s value
+    /// fetching (passwords and codes are read fresh), but shows instead of copies
+    /// and leaves the panel up; it hides on its own when the window takes focus.
+    func reveal(_ action: ItemAction) async {
+        guard let item = actionTarget, availableActions.contains(action) else { return }
+        // Remember where we were so closing the large-type window restores it.
+        revealResume = (item: item, inDetail: isShowingDetail, action: action)
+        switch action {
+        case .copyUsername:
+            guard let account = item.account else { toast = "No username for this item"; return }
+            onReveal?(RevealRequest(title: item.title, field: "Username", value: account))
+        case .copyPassword:
+            do {
+                let secret = try await password(for: item.reference)
+                onReveal?(RevealRequest(title: item.title, field: "Password", value: secret.reveal()))
+            } catch {
+                report(error, fallback: "Couldn't read the password")
+            }
+        case .copyTOTP:
+            do {
+                let code = try await client.totp(for: item.reference)
+                onReveal?(RevealRequest(title: item.title, field: "One-Time Code", value: code.reveal()))
+            } catch {
+                report(error, fallback: "No one-time code for this item")
+            }
+        case .openInBrowser:
+            break
+        }
+    }
+
     // MARK: - Password prefetch
 
     /// Returns the prefetched password when it matches, otherwise waits for an
@@ -297,6 +339,18 @@ final class QuickAccessViewModel: ObservableObject {
     /// another field from the same item.
     func prepareForShow() {
         toast = nil
+        // Returning from the large-type window: restore the exact item and field.
+        if let resume = revealResume {
+            revealResume = nil
+            urlChoices = nil
+            selection = resume.item.id
+            detailItem = resume.inDetail ? resume.item : nil
+            if resume.inDetail {
+                actionSelection = availableActions.contains(resume.action) ? resume.action : (availableActions.first ?? .copyPassword)
+            }
+            schedulePasswordPrefetch()
+            return
+        }
         let shouldResume = lastActionAt.map { Date().timeIntervalSince($0) < resumeWindow } ?? false
         if shouldResume, let item = resumeItem {
             // Reopen directly in the item's detail view.

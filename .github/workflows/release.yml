@@ -9,7 +9,9 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-15
+    # Build against the latest SDK so the shipped app gets the current UI look,
+    # not the one from an older Xcode. CI stays on macos-15 for stricter checks.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 

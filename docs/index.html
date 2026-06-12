@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pass Quick Access — native quick access for Proton Pass on macOS</title>
-<meta name="description" content="A native macOS quick-access window for Proton Pass. Press a hotkey from any app, search your logins, copy a username, password or one-time code, or open the site. Keyboard-driven. Secrets never persisted.">
+<title>Pass Quick Access, native quick access for Proton Pass on macOS</title>
+<meta name="description" content="A native macOS quick-access window for Proton Pass. Press a hotkey from any app, search your logins, copy a username, password or one-time code. Plus an SSH agent that gates your Proton Pass SSH keys behind Touch ID. Keyboard-driven. Secrets never persisted.">
 <link rel="icon" type="image/png" href="icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Pass Quick Access for macOS">
-<meta property="og:description" content="Press a hotkey from any app, search your Proton Pass logins, copy a username, password or one-time code. Native. Keyboard-driven. Secrets never persisted.">
+<meta property="og:description" content="Press a hotkey from any app, search your Proton Pass logins, copy a username, password or one-time code, plus an SSH agent with Touch ID, like 1Password. Native. Keyboard-driven.">
 <meta property="og:image" content="https://bsramin.github.io/pass-quick-access/icon-1024.png">
 <meta property="og:url" content="https://bsramin.github.io/pass-quick-access/">
 <meta name="twitter:card" content="summary_large_image">
@@ -68,8 +68,8 @@ nav{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px s
 @media(min-width:780px){.nav-links .btn-ghost{display:inline-flex}}
 
 /* ---- hero ---- */
-.hero{display:grid;gap:46px;align-items:center;padding:72px 0 60px;border-bottom:1px solid var(--line)}
-@media(min-width:960px){.hero{grid-template-columns:1.05fr 1fr;padding:92px 0 80px}}
+.hero{display:grid;gap:46px;align-items:center;padding-block:72px 60px;border-bottom:1px solid var(--line)}
+@media(min-width:960px){.hero{grid-template-columns:1.05fr 1fr;padding-block:92px 80px}}
 .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:"JetBrains Mono",monospace;
   font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
 .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
@@ -117,10 +117,10 @@ h1.title{font-size:clamp(40px,6.6vw,66px);font-weight:800;margin:20px 0 0;letter
 
 /* ---- section scaffold ---- */
 section{border-bottom:1px solid var(--line)}
-.sec-pad{padding:66px 0}
+.sec-pad{padding-block:66px}
 .sec-head{display:grid;gap:6px;margin-bottom:42px;max-width:44rem}
 .sec-num{font-family:"JetBrains Mono",monospace;font-size:12.5px;letter-spacing:.1em;color:var(--accent)}
-.sec-head h2{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-.03em}
+.sec-head h2{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-.03em;text-wrap:balance}
 .sec-head p{color:var(--ink-soft);font-size:18px;margin:10px 0 0}
 
 /* ---- feature grid (flat, ruled) ---- */
@@ -159,8 +159,12 @@ section{border-bottom:1px solid var(--line)}
 .flow-node .layer{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--accent);
   border:1px solid var(--line-2);padding:2px 7px;border-radius:5px}
 .flow-node p{color:var(--ink-soft);font-size:15px;margin:7px 0 0}
-.flow-edge{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-dim);
-  padding:9px 24px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.015)}
+.flow-edge{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-soft);
+  padding:12px 24px;border-bottom:1px solid var(--line);background:rgba(63,44,224,.06);
+  text-align:center;letter-spacing:.02em}
+.flow-arrow{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+  margin-right:7px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;
+  vertical-align:middle;transform:translateY(-1px)}
 
 /* ---- keyboard ---- */
 .keys-wrap{display:grid;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
@@ -171,12 +175,12 @@ section{border-bottom:1px solid var(--line)}
 .keyrow span{color:var(--ink-soft);font-size:15px}
 
 /* ---- screenshots ---- */
-.shots{display:grid;gap:18px;grid-template-columns:1fr}
-@media(min-width:720px){.shots{grid-template-columns:1.12fr .88fr}}
-.shot{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);position:relative}
+.shots{display:grid;gap:24px;grid-template-columns:1fr;align-items:start}
+@media(min-width:760px){.shots{grid-template-columns:1.22fr .85fr}}
+.shots-col{display:grid;gap:24px}
+.shot{margin:0;text-align:center}
 .shot img{display:block;width:100%;height:auto}
-.shot figcaption{position:absolute;left:12px;bottom:11px;font-family:"JetBrains Mono",monospace;font-size:11.5px;
-  color:var(--ink);background:rgba(251,250,246,.92);padding:4px 10px;border-radius:6px;border:1px solid var(--line-2)}
+.shot figcaption{margin-top:2px;font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-dim)}
 
 /* ---- get / final ---- */
 .get-grid{display:grid;gap:40px;align-items:start}
@@ -212,6 +216,56 @@ footer{padding:50px 0 38px}
 @media(prefers-reduced-motion:reduce){
   .reveal,[data-stagger]>*{opacity:1;transform:none;animation:none;transition:none}
 }
+
+/* ---- ssh agent ---- */
+.ssh-grid{display:grid;gap:28px;align-items:center}
+@media(min-width:820px){.ssh-grid{grid-template-columns:.92fr 1.08fr}}
+.ssh-shot{max-width:400px;margin:0 auto}
+.ssh-shot img{display:block;width:100%;height:auto}
+.ssh-steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.ssh-steps li{position:relative;padding:0 0 16px 42px;color:var(--ink-soft);font-size:16px;line-height:1.5}
+.ssh-steps li:last-child{padding-bottom:0}
+.ssh-steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:-1px;
+  width:27px;height:27px;border-radius:50%;background:var(--accent);color:#fff;font-family:"JetBrains Mono",monospace;
+  font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.ssh-steps li b{color:var(--ink);font-weight:600}
+.ssh-steps .mono{font-size:.92em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
+.ssh-migrate{margin-top:22px;border:1px solid var(--line-2);border-radius:12px;background:var(--panel);padding:18px 20px}
+.ssh-migrate h3{font-size:16px;font-weight:700;display:flex;align-items:center;gap:9px}
+.ssh-migrate h3 svg{color:var(--accent);flex:none}
+.ssh-migrate p{color:var(--ink-soft);font-size:14.5px;margin:9px 0 0}
+.ssh-migrate .mono{font-size:.9em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
+.ssh-aside{margin-top:18px;color:var(--ink-dim);font-size:13.5px;line-height:1.55}
+.ssh-aside b{color:var(--ink-soft);font-weight:600}
+.ssh-aside .mono{font-size:.9em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
+
+/* ---- mobile ---- */
+@media(max-width:640px){
+  .wrap{padding:0 18px}
+  .nav-in{height:56px;gap:8px}
+  .brand{font-size:15.5px}
+  .brand img{width:24px;height:24px}
+  .nav-links{gap:6px}
+  .nav-links a.txt{display:none}
+  .btn{padding:8px 14px;font-size:14px}
+  .hero{padding-block:44px 42px;gap:32px}
+  h1.title{font-size:clamp(33px,8.6vw,44px)}
+  .lede{font-size:16.5px;margin-top:18px}
+  .cta-row{margin-top:24px;gap:10px}
+  .cta-row .btn{flex:1 1 46%;justify-content:center}
+  .sec-pad{padding-block:46px}
+  .sec-head{margin-bottom:28px}
+  .sec-head p{font-size:16px}
+  .card,.shield,.keyrow{border-right:0}
+  .card{padding:22px 20px}
+  .shield{padding:20px}
+  .flow-node,.flow-edge{padding-left:18px;padding-right:18px}
+  .keyrow{padding:15px 16px}
+  .foot-grid{gap:26px}
+  .foot-cols{gap:30px}
+  .foot-bottom{flex-direction:column;gap:8px}
+  .install pre{font-size:12px;padding:15px}
+}
 </style>
 </head>
 <body>
@@ -221,6 +275,7 @@ footer{padding:50px 0 38px}
     <a class="brand" href="#top"><img src="icon.png" alt="">Pass Quick Access</a>
     <div class="nav-links">
       <a class="txt" href="#features">Features</a>
+      <a class="txt" href="#ssh">SSH agent</a>
       <a class="txt" href="#security">Security</a>
       <a class="txt" href="#how">How it works</a>
       <a class="btn btn-ghost" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">GitHub</a>
@@ -231,23 +286,24 @@ footer{padding:50px 0 38px}
 
 <header id="top" class="wrap hero">
   <div data-stagger>
-    <div class="eyebrow" style="animation-delay:.02s"><span class="dot"></span>Native macOS · for Proton Pass</div>
+    <div class="eyebrow" style="animation-delay:.02s">For Proton Pass</div>
     <h1 class="title" style="animation-delay:.08s">Your logins,<br>one keystroke <em>away.</em></h1>
-    <p class="lede" style="animation-delay:.16s">A native quick-access window for Proton Pass. Summon it over any app, search, and copy a username, password or one-time code — without ever opening the Electron app.</p>
+    <p class="lede" style="animation-delay:.16s">A native quick-access window for Proton Pass. Summon it over any app, search, and copy a username, password or one-time code, without ever opening the Electron app.</p>
     <div class="cta-row" style="animation-delay:.24s">
-      <a class="btn btn-primary" href="#get">Build &amp; run <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn btn-primary" href="#get">Download <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       <a class="btn btn-ghost" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.84 21.5c.5.08.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.16.57.67.48A10 10 0 0 0 12 2Z"/></svg>
         Star on GitHub
       </a>
     </div>
     <div class="hotkey-note" style="animation-delay:.32s">
-      Default hotkey <span class="keys"><kbd>⌥</kbd><kbd>⇧</kbd><kbd>Space</kbd></span> — fully configurable
+      Default hotkey <span class="keys"><kbd>⌥</kbd><kbd>⇧</kbd><kbd>Space</kbd></span>, fully configurable
     </div>
     <div class="trust-row" style="animation-delay:.4s">
+      <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Native macOS</span>
       <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>Secrets never stored</span>
       <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5a2 2 0 0 1 2-2h2M16 3h2a2 2 0 0 1 2 2v2M20 17v2a2 2 0 0 1-2 2h-2M8 21H6a2 2 0 0 1-2-2v-2"/></svg>Keyboard-first</span>
-      <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>Open source · GPLv3</span>
+      <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>Open source, GPLv3</span>
     </div>
   </div>
 
@@ -266,14 +322,14 @@ footer{padding:50px 0 38px}
       </div>
       <div class="toast" id="toast"><span class="tdot"></span><span id="toastText">Password copied</span></div>
     </div>
-    <div class="demo-cap">↑ a live, interactive replica — type and press ↵</div>
+    <div class="demo-cap">↑ a live, interactive replica, type and press ↵</div>
   </div>
 </header>
 
 <section id="features">
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">01 — Features</div>
+      <div class="sec-num">01 Features</div>
       <h2>Built for muscle memory.</h2>
       <p>Everything happens from the keyboard, over whatever you're working in. No window switching, no waiting for an Electron app to wake up.</p>
     </div>
@@ -281,12 +337,12 @@ footer{padding:50px 0 38px}
       <div class="card span2">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
         <h3>Search that matches Proton Pass</h3>
-        <p>The same substring, diacritic-insensitive, multi-word matching as the official client — across titles, usernames, emails, URLs, notes and custom fields. Ordered by most recently modified or alphabetically.</p>
+        <p>The same substring, diacritic-insensitive, multi-word matching as the official client, across titles, usernames, emails, URLs, notes and custom fields. Ordered by most recently modified or alphabetically.</p>
       </div>
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
         <h3>Copy what you need</h3>
-        <p>Username, password, or one-time code — each shown only when the item actually has that field.</p>
+        <p>Username, password, or one-time code, each shown only when the item actually has that field.</p>
       </div>
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></div>
@@ -306,7 +362,7 @@ footer{padding:50px 0 38px}
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></div>
         <h3>Private by default</h3>
-        <p>Items show a locally generated monogram. Opt in to favicons with a clear notice — never fetched for local or private addresses.</p>
+        <p>Items show a locally generated monogram. Opt in to favicons with a clear notice, never fetched for local or private addresses.</p>
       </div>
     </div>
   </div>
@@ -315,12 +371,12 @@ footer{padding:50px 0 38px}
 <section id="security">
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">02 — Security model</div>
+      <div class="sec-num">02 Security model</div>
       <h2>It's a password tool. So it earns the trust.</h2>
       <p>The app never reimplements Proton's crypto or auth. It drives the official, Proton-maintained <a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> and is careful never to be the weaker link.</p>
     </div>
     <div class="shield-list reveal">
-      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Secrets are never persisted or indexed</b><p>The in-memory index holds only titles, URLs, usernames and whether a password or code exists — never the values.</p></div></div>
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Secrets are never persisted or indexed</b><p>The in-memory index holds only titles, URLs, usernames and whether a password or code exists, never the values.</p></div></div>
       <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Read fresh, cleared fast</b><p>Passwords and codes are read from pass-cli at the moment you copy, marked concealed on the pasteboard, and cleared after 30 seconds.</p></div></div>
       <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Authentication lives in pass-cli</b><p>The app holds no Proton credentials and relies entirely on the CLI's existing session.</p></div></div>
       <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Hardened runtime</b><p>Signed release builds use the hardened runtime without <span class="mono">get-task-allow</span>, so other processes can't attach. Nothing is written to disk.</p></div></div>
@@ -328,23 +384,51 @@ footer{padding:50px 0 38px}
   </div>
 </section>
 
+<section id="ssh">
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">03 SSH agent</div>
+      <h2>Your SSH keys, gated by Touch ID.</h2>
+      <p>Just like 1Password's SSH agent: it serves the SSH keys you keep in Proton Pass to <span class="mono">git</span> and <span class="mono">ssh</span>, and asks for Touch ID before every signature, naming the app that's asking. The private keys never leave pass-cli; the app only adds the native confirmation.</p>
+    </div>
+    <div class="ssh-grid reveal">
+      <figure class="ssh-shot"><img src="screenshots/ssh-agent.png" alt="SSH key signature request with a Touch ID prompt" loading="lazy"></figure>
+      <div>
+        <ol class="ssh-steps">
+          <li>Turn on <b>Enable SSH agent</b> in Settings → SSH. The app starts the upstream <span class="mono">pass-cli</span> agent for you.</li>
+          <li>Click <b>Configure ~/.ssh/config automatically</b>, it adds <span class="mono">IdentityAgent ~/.ssh/pass-quick-access-agent.sock</span>.</li>
+          <li>Use <span class="mono">git</span> and <span class="mono">ssh</span> as usual. Each signature pops a Touch ID prompt; approve once and you're through.</li>
+        </ol>
+        <p class="ssh-aside"><b>Tip:</b> the config entry covers <span class="mono">ssh</span> and <span class="mono">git</span>. For tools that read the <span class="mono">SSH_AUTH_SOCK</span> environment variable instead of <span class="mono">~/.ssh/config</span> (like <span class="mono">ssh-add</span> or some GUI clients), also turn on <b>Set SSH_AUTH_SOCK for new programs</b>, it publishes the proxy to your login session for programs launched afterwards.</p>
+        <div class="ssh-migrate">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+            Coming from 1Password?
+          </h3>
+          <p>Same workflow. Move your SSH keys into Proton Pass and let the app write the <span class="mono">~/.ssh/config</span> entry for you (step 2). Then just remove 1Password's own <span class="mono">IdentityAgent</span> line and turn off its agent. One gotcha shared by every agent: an explicit on-disk <span class="mono">IdentityFile</span> for a host wins over the agent, so drop those lines for the hosts you want served from Proton Pass.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="how">
   <div class="wrap sec-pad">
-    <div class="sec-head reveal" style="margin-left:auto;margin-right:auto;text-align:center">
-      <div class="sec-num">03 — How it works</div>
+    <div class="sec-head reveal" style="margin-left:auto;margin-right:auto;text-align:center;max-width:52rem">
+      <div class="sec-num">04 How it works</div>
       <h2>A thin, native shell over the official CLI.</h2>
     </div>
     <div class="flow reveal">
       <div class="flow-node">
-        <h3><span class="layer">UI</span>Floating panel · AppKit NSPanel + SwiftUI</h3>
+        <h3><span class="layer">UI</span>Floating panel (AppKit NSPanel + SwiftUI)</h3>
         <p>hotkey ▸ search ▸ pick ▸ copy / open. Opens over any app and dismisses when it loses focus.</p>
       </div>
-      <div class="flow-edge">↓ metadata only — titles, URLs, usernames</div>
+      <div class="flow-edge"><span class="flow-arrow">↓</span>metadata only: titles, URLs, usernames</div>
       <div class="flow-node">
-        <h3><span class="layer">CORE</span>PassCLIClient · an actor over pass-cli</h3>
-        <p>vault list · item list · item view. Secrets are fetched just-in-time and never cached.</p>
+        <h3><span class="layer">CORE</span>PassCLIClient, an actor over pass-cli</h3>
+        <p>vault list, item list, item view. Secrets are fetched just-in-time and never cached.</p>
       </div>
-      <div class="flow-edge">↓ secrets fetched on demand</div>
+      <div class="flow-edge"><span class="flow-arrow">↓</span>secrets fetched on demand</div>
       <div class="flow-node">
         <h3><span class="layer">CLI</span>pass-cli ▸ Proton Pass servers</h3>
         <p>The Proton-maintained client handles all authentication and cryptography.</p>
@@ -356,32 +440,15 @@ footer{padding:50px 0 38px}
 <section>
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">04 — Keyboard</div>
-      <h2>Hands stay home.</h2>
-    </div>
-    <div class="keys-wrap reveal">
-      <div class="keyrow"><span class="kc"><kbd>↑</kbd><kbd>↓</kbd></span><span>Move through results</span></div>
-      <div class="keyrow"><span class="kc"><kbd>⇞</kbd><kbd>⇟</kbd></span><span>Jump by page</span></div>
-      <div class="keyrow"><span class="kc"><kbd>↖</kbd><kbd>↘</kbd></span><span>Home &amp; End</span></div>
-      <div class="keyrow"><span class="kc"><kbd>→</kbd></span><span>Open an item</span></div>
-      <div class="keyrow"><span class="kc"><kbd>←</kbd></span><span>Step back</span></div>
-      <div class="keyrow"><span class="kc"><kbd>esc</kbd></span><span>Close the panel</span></div>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap sec-pad">
-    <div class="sec-head reveal">
-      <div class="sec-num">05 — Screenshots</div>
+      <div class="sec-num">05 Screenshots</div>
       <h2>Native, down to the pixel.</h2>
     </div>
     <div class="shots reveal">
-      <figure class="shot"><img src="screenshots/search.png" alt="Quick-access search panel" loading="lazy"><figcaption>search panel</figcaption></figure>
+      <div class="shots-col">
+        <figure class="shot"><img src="screenshots/search.png" alt="Quick-access search panel" loading="lazy"><figcaption>search panel</figcaption></figure>
+        <figure class="shot"><img src="screenshots/detail.png" alt="Item detail view with copy actions" loading="lazy"><figcaption>item detail</figcaption></figure>
+      </div>
       <figure class="shot"><img src="screenshots/settings.png" alt="Settings window" loading="lazy"><figcaption>settings</figcaption></figure>
-    </div>
-    <div class="shots reveal" style="margin-top:18px;grid-template-columns:1fr">
-      <figure class="shot"><img src="screenshots/detail.png" alt="Item detail view with copy actions" loading="lazy"><figcaption>item detail</figcaption></figure>
     </div>
   </div>
 </section>
@@ -389,25 +456,24 @@ footer{padding:50px 0 38px}
 <section id="get">
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">06 — Get it</div>
+      <div class="sec-num">06 Get it</div>
       <h2>Get it running.</h2>
     </div>
     <div class="get-grid">
       <div class="reveal">
-        <p style="color:var(--ink-soft);font-size:16px;margin:0">Distribution is build-from-source today. You'll need:</p>
-        <ul class="req">
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg>macOS 14 or later</li>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg><span><a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> installed and logged in</span></li>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg><span><a class="mono" style="color:var(--accent)" href="https://github.com/yonaskolb/XcodeGen" target="_blank" rel="noopener">XcodeGen</a> to generate the project</span></li>
-        </ul>
-        <p class="note">A notarized release needs an Apple Developer ID certificate. <a style="color:var(--accent)" href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsoring</a> helps cover it, so builds open without a Gatekeeper prompt.</p>
+        <p style="color:var(--ink-soft);font-size:16px;margin:0 0 18px">Grab the latest pre-built app, or build it from source. Either way you'll need macOS 14+ and <a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> installed and logged in.</p>
+        <a class="btn btn-primary" href="https://github.com/bsramin/pass-quick-access/releases/latest" target="_blank" rel="noopener">Download for macOS
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg>
+        </a>
+        <p class="note">The download isn't notarized yet (a notarized release needs an Apple Developer ID certificate). The first time, right-click the app and choose <b>Open</b> to get past Gatekeeper, or run <span class="mono">xattr -dr com.apple.quarantine PassQuickAccess.app</span>. <a style="color:var(--accent)" href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsoring</a> helps cover notarization.</p>
       </div>
       <div class="install reveal">
         <div class="ihead">
           <span class="dotmac" style="background:#ff5f57"></span><span class="dotmac" style="background:#febc2e"></span><span class="dotmac" style="background:#28c840"></span>
           <span style="margin-left:8px">Terminal</span>
         </div>
-        <pre><span class="c"># clone &amp; build</span>
+        <pre><span class="c"># Build from source</span>
+<span class="c"># needs xcodegen too</span>
 git clone https://github.com/bsramin/pass-quick-access
 <span class="g">cd</span> pass-quick-access
 xcodegen generate
@@ -418,8 +484,9 @@ xcodebuild -scheme PassQuickAccess \
       </div>
     </div>
     <div class="cta-row reveal" style="margin-top:34px">
-      <a class="btn btn-primary" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">View on GitHub</a>
-      <a class="btn btn-ghost" href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsor the project</a>
+      <a class="btn btn-primary" href="https://github.com/bsramin/pass-quick-access/releases/latest" target="_blank" rel="noopener">Download</a>
+      <a class="btn btn-ghost" href="https://github.com/bsramin/pass-quick-access" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsor</a>
     </div>
   </div>
 </section>
@@ -444,13 +511,13 @@ xcodebuild -scheme PassQuickAccess \
           <a href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a>
           <a href="https://proton.me/pass" target="_blank" rel="noopener">Proton Pass</a>
           <a href="https://github.com/sponsors/bsramin" target="_blank" rel="noopener">Sponsor</a>
-          <a href="https://github.com/bsramin/pass-quick-access/blob/main/LICENSE" target="_blank" rel="noopener">License · GPLv3</a>
+          <a href="https://github.com/bsramin/pass-quick-access/blob/main/LICENSE" target="_blank" rel="noopener">License (GPLv3)</a>
         </div>
       </div>
     </div>
     <div class="foot-bottom">
       <span style="max-width:46em">Not affiliated with or endorsed by Proton AG. Proton Pass is a trademark of Proton AG.</span>
-      <span>© 2026 · GPL-3.0</span>
+      <span>© 2026, GPL-3.0. Made in Europe with <span style="color:#e0245e">♥</span></span>
     </div>
   </div>
 </footer>

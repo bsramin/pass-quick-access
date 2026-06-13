@@ -14,6 +14,23 @@ desktop app and no native quick-access of its own.
 
 > Not affiliated with or endorsed by Proton AG.
 
+## 💛 Looking for a sponsor
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/bsramin)
+
+This is a free, open-source side project, and it will stay that way. I'm looking
+for a **sponsor to cover the Apple Developer Program membership** (99 USD/year).
+
+With it, I can ship the app **notarized and signed**, so it installs without
+Gatekeeper warnings, and add **automatic updates** so everyone stays on the
+latest version effortlessly. The app would remain **completely free and fully
+open source** for everyone, forever. The sponsorship pays only for the Apple
+membership that makes safe, frictionless distribution possible.
+
+If you or your company would like to help, you can sponsor through
+**[GitHub Sponsors](https://github.com/sponsors/bsramin)**. Your support would be
+credited here with thanks.
+
 ## Screenshots
 
 | Search | Item detail | Settings |

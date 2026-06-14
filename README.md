@@ -80,6 +80,11 @@ Proton-maintained command-line client, and wraps it in a native macOS UI.
   same item, to grab another field.
 - **Optional Touch ID lock** with a configurable timeout, falling back to your
   Mac password.
+- **Stays signed in**: when your Proton Pass session expires, the panel offers a
+  one-click sign-in that opens Proton's web login in your browser, then reloads
+  itself and the SSH agent once you're back. Optionally save a Personal Access
+  Token (in the Keychain, behind Touch ID) to reconnect without the browser,
+  reusing your next Touch ID. Set it up under **Settings → Account**.
 - **Website icons** are off by default; items show a locally generated monogram.
   You can opt in to fetching favicons, with a clear notice of what that shares.
   Favicons are never fetched for local or private addresses, including hostnames

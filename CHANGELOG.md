@@ -1,5 +1,17 @@
 # Changelog
 
+## v2026-06-14.1
+
+### Added
+- Stay signed in across a session expiry. When your Proton Pass session expires,
+  the panel no longer dead-ends: it offers a one-click sign-in that opens
+  Proton's web login in your browser, then reloads the index and the SSH agent
+  once you're back, with no relaunch.
+- Optional Personal Access Token, stored in the Keychain behind Touch ID, to
+  reconnect without the browser. The app re-logs in with it, reusing the next
+  Touch ID you do for the panel or an SSH signature. Manage it under
+  Settings → Account.
+
 ## v2026-06-12.1
 
 ### Added

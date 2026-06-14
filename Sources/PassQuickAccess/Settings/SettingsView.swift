@@ -7,6 +7,8 @@ struct SettingsView: View {
     /// The SSH proxy controller, or `nil` when pass-cli wasn't found so the
     /// agent can't run. The General tab still works either way.
     var agentController: AgentProxyController?
+    /// Drives the "sign in now" reconnect after a token is saved.
+    var reconnector: PATReconnector?
 
     @AppStorage(SettingKey.loadWebsiteIcons) private var loadWebsiteIcons = false
     @AppStorage(SettingKey.requireAuth) private var requireAuth = false
@@ -20,6 +22,8 @@ struct SettingsView: View {
         TabView {
             general
                 .tabItem { Label("General", systemImage: "gearshape") }
+            AccountSettingsView(reconnector: reconnector)
+                .tabItem { Label("Account", systemImage: "person.crop.circle") }
             ssh
                 .tabItem { Label("SSH Agent", systemImage: "key.horizontal") }
         }

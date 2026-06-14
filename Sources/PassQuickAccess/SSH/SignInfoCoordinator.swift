@@ -27,6 +27,11 @@ final class SignInfoCoordinator {
     private var evaluating = false
     private var isBusy = false
 
+    /// Called with the authenticated context right after an approval, before the
+    /// signature is forwarded, so a dropped session can be restored within the same
+    /// Touch ID. It must not restart the agent (the upstream connection is in use).
+    var onAuthenticated: ((LAContext) async -> Void)?
+
     func present(_ request: SignRequest) async -> Bool {
         await withCheckedContinuation { continuation in
             queue.append(Pending(request: request, continuation: continuation))
@@ -75,7 +80,11 @@ final class SignInfoCoordinator {
 
     private func runEvaluation(auth: BiometricContext, request: SignRequest) async -> Bool {
         do {
-            return try await auth.evaluate(.deviceOwnerAuthenticationWithBiometrics, reason: Self.reason(for: request))
+            let approved = try await auth.evaluate(.deviceOwnerAuthenticationWithBiometrics, reason: Self.reason(for: request))
+            // Reuse this Touch ID to restore the session before the signature is
+            // forwarded, so a logged-out session doesn't fail the sign.
+            if approved { await onAuthenticated?(auth.context) }
+            return approved
         } catch let error as LAError where Self.biometricsUnusable(error) {
             // Touch ID is locked out or otherwise unusable. Drop the embedded card
             // and offer the system prompt, which falls back to the Mac password, so

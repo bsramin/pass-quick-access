@@ -103,6 +103,18 @@ final class PassCLIClientTests: XCTestCase {
             XCTAssertEqual((error as? PassCLIError)?.isAuthenticationFailure, true)
         }
     }
+
+    func testPATLoginPassesTokenThroughEnvironmentNotArguments() async throws {
+        let runner = CapturingRunner()
+        let client = PassCLIClient(executable: executable, runner: runner)
+        let token = "pst_secrettoken::secretkey"
+
+        try await client.login(withPAT: SensitiveString(token))
+
+        XCTAssertEqual(runner.arguments, ["login"])
+        XCTAssertEqual(runner.environment?["PROTON_PASS_PERSONAL_ACCESS_TOKEN"], token)
+        XCTAssertFalse(runner.arguments.contains(token), "the token must never appear in argv")
+    }
 }
 
 // MARK: - Fixtures
@@ -149,8 +161,23 @@ private struct FakeProcessRunner: ProcessRunning {
         }
     }
 
-    func run(executable: URL, arguments: [String], timeout: Duration) async throws -> ProcessResult {
+    func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult {
         handler(arguments)
+    }
+}
+
+/// Records the last invocation so a test can assert how a command was spawned.
+private final class CapturingRunner: ProcessRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var arguments: [String] = []
+    private(set) var environment: [String: String]?
+
+    func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult {
+        lock.withLock {
+            self.arguments = arguments
+            self.environment = environment
+        }
+        return ProcessResult(status: 0, stdout: Data(), stderr: Data())
     }
 }
 

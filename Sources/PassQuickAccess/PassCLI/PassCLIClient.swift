@@ -26,6 +26,45 @@ actor PassCLIClient {
         _ = try await execute(["test"])
     }
 
+    /// Whether `pass-cli` currently has a usable session. Unlike `verifySession`
+    /// this swallows the error, for callers polling to see when a login lands.
+    func hasSession() async -> Bool {
+        do {
+            try await verifySession()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Establishes a session from a Personal Access Token. The token is handed to
+    /// `pass-cli login` through the environment, never as an argument, so it can't
+    /// be read from another process's view of the command line.
+    func login(withPAT token: SensitiveString) async throws {
+        let environment = ["PROTON_PASS_PERSONAL_ACCESS_TOKEN": token.reveal()]
+        Self.ensureSessionDirectory()
+        do {
+            _ = try await execute(["login"], environment: environment)
+        } catch let error as PassCLIError where error.isCorruptLocalSession {
+            // A stale, undecryptable local session (e.g. left by a forced logout)
+            // blocks login before the token is tried. Clear it and retry once, as
+            // pass-cli itself recommends.
+            _ = try? await execute(["logout", "--force"])
+            Self.ensureSessionDirectory()
+            _ = try await execute(["login"], environment: environment)
+        }
+    }
+
+    /// pass-cli's `logout` deletes its session directory, and a token login then
+    /// fails to recreate it ("No such file or directory" while writing the
+    /// session). Recreate it first so the login can persist.
+    private static func ensureSessionDirectory() {
+        guard let support = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let directory = support.appendingPathComponent("proton-pass-cli/.session", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
     func vaults() async throws -> [Vault] {
         let response: VaultList = try await json(["vault", "list", "--output", "json"])
         return response.vaults
@@ -106,8 +145,8 @@ actor PassCLIClient {
         return text
     }
 
-    private func execute(_ arguments: [String]) async throws -> ProcessResult {
-        let result = try await runner.run(executable: executable, arguments: arguments, timeout: timeout)
+    private func execute(_ arguments: [String], environment: [String: String]? = nil) async throws -> ProcessResult {
+        let result = try await runner.run(executable: executable, arguments: arguments, environment: environment, timeout: timeout)
         guard result.status == 0 else {
             let stderr = String(decoding: result.stderr, as: UTF8.self)
             throw PassCLIError.commandFailed(status: result.status, stderr: stderr)

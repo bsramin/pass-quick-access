@@ -40,7 +40,9 @@ final class QuickAccessViewModel: ObservableObject {
         }
     }
 
-    static let signedOutMessage = "Signed out of Proton Pass. Run `pass-cli login` in Terminal, then reopen."
+    /// Sentinel message for the signed-out state; the view renders it as a
+    /// sign-in prompt rather than plain error text.
+    static let signedOutMessage = "Signed out of Proton Pass"
 
     @Published var query = "" {
         // Only refilter on a real change: a no-op rewrite (e.g. the text field
@@ -52,6 +54,10 @@ final class QuickAccessViewModel: ObservableObject {
         didSet { if selection != oldValue { schedulePasswordPrefetch() } }
     }
     @Published private(set) var loadState: LoadState = .idle
+    /// True while waiting for a sign-in to land after the user was sent to log in.
+    @Published private(set) var isRecovering = false
+    /// Whether a stored access token offers a one-tap reconnect from signed-out.
+    @Published var canReconnect = false
     @Published var toast: String?
     /// Bumped on each copy so the view can flash the selection.
     @Published private(set) var copyFlashes = 0
@@ -66,6 +72,12 @@ final class QuickAccessViewModel: ObservableObject {
     var onDismiss: (() -> Void)?
     /// Invoked to show a field's value in the large-type window.
     var onReveal: ((RevealRequest) -> Void)?
+    /// Invoked when the user asks to sign back in from the signed-out state.
+    var onSignIn: (() -> Void)?
+    /// Invoked when the user asks to reconnect using the stored access token.
+    var onReconnect: (() -> Void)?
+    /// Invoked when the user cancels a sign-in that's being waited on.
+    var onCancelRecovery: (() -> Void)?
 
     /// A value to display big, with the item and field it came from.
     struct RevealRequest {
@@ -114,6 +126,40 @@ final class QuickAccessViewModel: ObservableObject {
         return !query.isEmpty
     }
 
+    var isSignedOut: Bool {
+        if case .failed(Self.signedOutMessage) = loadState { return true }
+        return false
+    }
+
+    /// Triggered from the signed-out prompt: enters the recovering state and asks
+    /// the controller to start the login flow.
+    func requestSignIn() {
+        guard !isRecovering else { return }
+        isRecovering = true
+        onSignIn?()
+    }
+
+    /// Reconnects using the stored access token instead of an interactive sign-in.
+    func requestReconnect() {
+        guard !isRecovering else { return }
+        isRecovering = true
+        onReconnect?()
+    }
+
+    /// Stops waiting on a sign-in and returns to the signed-out prompt.
+    func cancelRecovery() {
+        guard isRecovering else { return }
+        isRecovering = false
+        onCancelRecovery?()
+    }
+
+    /// Resolves a recovery attempt. On success the index is reloaded so the panel
+    /// is usable again without reopening.
+    func finishRecovery(succeeded: Bool) async {
+        isRecovering = false
+        if succeeded { await reload() }
+    }
+
     var selectedItem: ItemSummary? {
         results.first { $0.id == selection }
     }
@@ -133,10 +179,21 @@ final class QuickAccessViewModel: ObservableObject {
             loadState = .ready
             refilter()
         } catch let error as PassCLIError where error.isAuthenticationFailure {
-            loadState = .failed(Self.signedOutMessage)
+            enterFailure(Self.signedOutMessage)
         } catch {
-            loadState = .failed(String(describing: error))
+            enterFailure(String(describing: error))
         }
+    }
+
+    /// Switches to a full-window status state, clearing any list or detail left
+    /// over from before the failure so the panel resizes and drops the footer.
+    private func enterFailure(_ message: String) {
+        loadState = .failed(message)
+        index = SearchIndex(items: [])
+        results = []
+        detailItem = nil
+        urlChoices = nil
+        selection = nil
     }
 
     // MARK: - Navigation
@@ -372,7 +429,7 @@ final class QuickAccessViewModel: ObservableObject {
     /// wherever it happens.
     private func report(_ error: Error, fallback: String) {
         if let cliError = error as? PassCLIError, cliError.isAuthenticationFailure {
-            loadState = .failed(Self.signedOutMessage)
+            enterFailure(Self.signedOutMessage)
         } else {
             toast = fallback
         }

@@ -33,8 +33,14 @@ final class AgentProxyController: ObservableObject {
     private let infoCoordinator = SignInfoCoordinator()
     private var listener: AgentSocketListener?
 
-    init(executable: URL) {
+    init(executable: URL, reconnector: PATReconnector? = nil) {
         self.executable = executable
+        // After an SSH approval, reuse that Touch ID to restore a dropped session
+        // before the signature is forwarded. Session only, never an agent restart:
+        // the relay's upstream connection is mid-request.
+        infoCoordinator.onAuthenticated = { [weak reconnector] context in
+            await reconnector?.restoreSessionIfNeeded(using: context)
+        }
     }
 
     var proxySocketPath: String {
@@ -83,6 +89,24 @@ final class AgentProxyController: ObservableObject {
         listener = nil
         status = .off
         setSessionSocket(false)
+    }
+
+    /// Brings the agent back after the `pass-cli` session was restored. A logged-out
+    /// session leaves the upstream daemon unable to serve keys, so this restarts it;
+    /// if the proxy itself isn't up yet (agent enabled mid-session) it starts fresh.
+    func recover() async {
+        guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled) else { return }
+        guard listener != nil else {
+            await start()
+            return
+        }
+        status = .starting
+        let daemon = UpstreamDaemonManager(
+            executable: executable,
+            socketPath: configuredUpstreamPath(),
+            vaultFilter: vaultFilter()
+        )
+        status = await daemon.ensureRunning() ? .running : .upstreamUnavailable
     }
 
     /// Applies the "set SSH_AUTH_SOCK" toggle immediately.

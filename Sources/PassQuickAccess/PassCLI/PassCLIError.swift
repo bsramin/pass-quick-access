@@ -24,9 +24,20 @@ extension PassCLIError {
         guard case let .commandFailed(_, stderr) = self else { return false }
         let message = stderr.lowercased()
         return message.contains("not logged in")
+            || message.contains("no session")
+            || message.contains("authenticated client")
             || message.contains("session")
             || message.contains("unauthorized")
             || message.contains("log in")
+    }
+
+    /// True when a command failed because the locally stored session can't be
+    /// decrypted (its key is missing or changed). A forced logout clears it.
+    var isCorruptLocalSession: Bool {
+        guard case let .commandFailed(_, stderr) = self else { return false }
+        let message = stderr.lowercased()
+        return (message.contains("decrypting") && message.contains("session"))
+            || message.contains("removed your local key")
     }
 }
 

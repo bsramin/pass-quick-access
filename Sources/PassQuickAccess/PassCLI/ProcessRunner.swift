@@ -11,18 +11,25 @@ struct ProcessResult: Sendable {
 /// Abstraction over spawning a child process, so `PassCLIClient` can be driven
 /// by a fake in tests instead of touching the real `pass-cli` binary.
 protocol ProcessRunning: Sendable {
-    func run(executable: URL, arguments: [String], timeout: Duration) async throws -> ProcessResult
+    func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult
+}
+
+extension ProcessRunning {
+    /// Convenience for the common case of inheriting the parent environment.
+    func run(executable: URL, arguments: [String], timeout: Duration) async throws -> ProcessResult {
+        try await run(executable: executable, arguments: arguments, environment: nil, timeout: timeout)
+    }
 }
 
 /// Runs the process for real. Output is captured through temporary files rather
 /// than pipes to avoid the classic 64 KB pipe-buffer deadlock when a vault
 /// listing is large.
 struct SystemProcessRunner: ProcessRunning {
-    func run(executable: URL, arguments: [String], timeout: Duration) async throws -> ProcessResult {
+    func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 continuation.resume(with: Result {
-                    try Self.runSynchronously(executable: executable, arguments: arguments, timeout: timeout)
+                    try Self.runSynchronously(executable: executable, arguments: arguments, environment: environment, timeout: timeout)
                 })
             }
         }
@@ -31,6 +38,7 @@ struct SystemProcessRunner: ProcessRunning {
     private static func runSynchronously(
         executable: URL,
         arguments: [String],
+        environment: [String: String]?,
         timeout: Duration
     ) throws -> ProcessResult {
         let fileManager = FileManager.default
@@ -51,6 +59,13 @@ struct SystemProcessRunner: ProcessRunning {
         process.arguments = arguments
         process.standardOutput = outputHandle
         process.standardError = errorHandle
+        if let environment {
+            // Merge over the inherited environment so the child keeps PATH and the
+            // rest while gaining the added keys (e.g. a one-shot login token).
+            var merged = ProcessInfo.processInfo.environment
+            merged.merge(environment) { _, added in added }
+            process.environment = merged
+        }
 
         do {
             try process.run()

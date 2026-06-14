@@ -12,6 +12,9 @@ import SwiftUI
 final class QuickAccessController {
     private let viewModel: QuickAccessViewModel
     private let largeType = LargeTypeWindowController()
+    private let recovery: SessionRecovery
+    private let reconnector: PATReconnector
+    private let webLogin: WebLogin
     private var panel: QuickAccessPanel?
     private var previousApp: NSRunningApplication?
     private var anchorTopLeft: NSPoint?
@@ -21,16 +24,30 @@ final class QuickAccessController {
     /// reappears after the large-type window closes.
     private var appBeforeLargeType: NSRunningApplication?
 
+    /// Invoked after a signed-out session is restored, so the SSH agent can be
+    /// brought back in step with the panel.
+    var onSessionRestored: (() async -> Void)?
+
     private let panelWidth: CGFloat = 640
 
-    init(client: PassCLIClient) {
+    init(client: PassCLIClient, executable: URL, reconnector: PATReconnector) {
+        self.recovery = SessionRecovery(client: client)
+        self.reconnector = reconnector
+        self.webLogin = WebLogin(executable: executable)
         viewModel = QuickAccessViewModel(client: client)
         viewModel.onDismiss = { [weak self] in self?.hide() }
+        viewModel.onSignIn = { [weak self] in self?.beginSignIn() }
+        viewModel.onReconnect = { [weak self] in self?.beginReconnect() }
+        viewModel.onCancelRecovery = { [weak self] in
+            self?.recovery.cancel()
+            self?.webLogin.cancel()
+        }
         viewModel.onReveal = { [weak self] request in
             guard let self else { return }
             self.appBeforeLargeType = self.previousApp
             self.largeType.show(title: request.title, field: request.field, value: request.value)
         }
+        reconnector.onReconnected = { [weak self] in await self?.handleSessionRestored() }
         largeType.onClose = { [weak self] in self?.reshowAfterLargeType() }
         cancellable = viewModel.objectWillChange.sink { [weak self] in
             // objectWillChange fires before the value updates; defer so the
@@ -57,6 +74,40 @@ final class QuickAccessController {
         if panel?.isVisible == true { hide() } else { show() }
     }
 
+    /// Starts the browser login and waits for the session to come back, then
+    /// reloads the panel and recovers the agent. Driven from the signed-out
+    /// prompt; the panel stays open showing progress while it waits.
+    private func beginSignIn() {
+        webLogin.start()
+        recovery.waitForSession { [weak self] restored in
+            guard let self else { return }
+            Task { @MainActor in
+                self.webLogin.cancel()
+                if restored {
+                    await self.handleSessionRestored()
+                } else {
+                    await self.viewModel.finishRecovery(succeeded: false)
+                }
+            }
+        }
+    }
+
+    /// Reconnects with the stored access token: one Touch ID, then the session,
+    /// panel and agent all come back. On failure the prompt is left in place.
+    private func beginReconnect() {
+        Task {
+            let restored = await reconnector.reconnectInteractively(reason: "sign back in to Proton Pass")
+            if !restored { await viewModel.finishRecovery(succeeded: false) }
+        }
+    }
+
+    /// Shared completion for any successful re-login: reload the index and bring
+    /// the SSH agent back in step.
+    private func handleSessionRestored() async {
+        await viewModel.finishRecovery(succeeded: true)
+        await onSessionRestored?()
+    }
+
     /// Brings the panel back on the same item after the large-type window closes,
     /// without re-authenticating (the session was just unlocked).
     private func reshowAfterLargeType() {
@@ -73,10 +124,12 @@ final class QuickAccessController {
             return
         }
         Task {
-            if await BiometricAuth.authenticate(reason: "unlock Pass Quick Access") {
-                lastUnlock = Date()
-                present(frontmost: frontmost)
-            }
+            guard let auth = await BiometricAuth.authenticatedContext(reason: "unlock Pass Quick Access") else { return }
+            lastUnlock = Date()
+            present(frontmost: frontmost)
+            // Reuse the unlock's Touch ID to restore a dropped session, so the
+            // panel fills in instead of showing the signed-out prompt.
+            await reconnector.reconnectIfNeeded(using: auth.context)
         }
     }
 
@@ -84,6 +137,7 @@ final class QuickAccessController {
         previousApp = frontmost
 
         viewModel.prepareForShow()
+        viewModel.canReconnect = PATStore.hasToken()
 
         let panel = panel ?? makePanel()
         self.panel = panel
@@ -166,9 +220,10 @@ final class QuickAccessController {
         let rowHeight: CGFloat = 48
         let listPadding: CGFloat = 16
         let visibleRows = min(viewModel.results.count, 8)
-        let listHeight = visibleRows > 0
-            ? CGFloat(visibleRows) * rowHeight + listPadding
-            : QuickAccessView.statusAreaHeight
-        return searchField + 1 + listHeight + footer
+        guard visibleRows > 0 else {
+            // Status states (signed-out, loading, no matches) show no footer.
+            return searchField + 1 + QuickAccessView.statusAreaHeight
+        }
+        return searchField + 1 + CGFloat(visibleRows) * rowHeight + listPadding + footer
     }
 }

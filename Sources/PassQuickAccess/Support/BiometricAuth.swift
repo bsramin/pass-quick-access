@@ -10,8 +10,15 @@ enum BiometricAuth {
     /// the user neither approves nor cancels within it, the prompt is dismissed
     /// and the result is `false` (treated as a denial).
     static func authenticate(reason: String, timeout: Duration? = nil) async -> Bool {
+        await authenticatedContext(reason: reason, timeout: timeout) != nil
+    }
+
+    /// Like `authenticate`, but returns the authenticated context on success so a
+    /// caller can reuse the same Touch ID for a follow-on Keychain read. Returns
+    /// `nil` on failure, cancel, or timeout.
+    static func authenticatedContext(reason: String, timeout: Duration? = nil) async -> BiometricContext? {
         let auth = BiometricContext()
-        guard auth.canEvaluate(.deviceOwnerAuthentication) else { return false }
+        guard auth.canEvaluate(.deviceOwnerAuthentication) else { return nil }
 
         let timeoutTask: Task<Void, Never>? = timeout.map { limit in
             Task {
@@ -22,9 +29,9 @@ enum BiometricAuth {
         defer { timeoutTask?.cancel() }
 
         do {
-            return try await auth.evaluate(.deviceOwnerAuthentication, reason: reason)
+            return try await auth.evaluate(.deviceOwnerAuthentication, reason: reason) ? auth : nil
         } catch {
-            return false
+            return nil
         }
     }
 }

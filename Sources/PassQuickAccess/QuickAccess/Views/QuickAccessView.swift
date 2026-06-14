@@ -19,7 +19,9 @@ struct QuickAccessView: View {
                     detail(for: item)
                 } else {
                     content
-                    listFooter
+                    // The shortcut footer only makes sense when there are results to
+                    // act on, not in the signed-out, loading or empty states.
+                    if !viewModel.results.isEmpty { listFooter }
                 }
             }
         }
@@ -49,6 +51,12 @@ struct QuickAccessView: View {
             return .ignored
         }
         .onKeyPress(keys: [.return]) { press in
+            if viewModel.isSignedOut {
+                if !viewModel.isRecovering {
+                    if viewModel.canReconnect { viewModel.requestReconnect() } else { viewModel.requestSignIn() }
+                }
+                return .handled
+            }
             if press.modifiers.contains(.option) {
                 Task { await viewModel.perform(.openInBrowser) }
             } else if viewModel.isChoosingURL {
@@ -79,7 +87,8 @@ struct QuickAccessView: View {
             return .handled
         }
         .onExitCommand {
-            if viewModel.isChoosingURL { viewModel.closeURLChooser() }
+            if viewModel.isRecovering { viewModel.cancelRecovery() }
+            else if viewModel.isChoosingURL { viewModel.closeURLChooser() }
             else if viewModel.isShowingDetail { viewModel.closeDetail() }
             else { viewModel.dismiss() }
         }
@@ -117,7 +126,9 @@ struct QuickAccessView: View {
 
     @ViewBuilder
     private var content: some View {
-        if case .failed(let message) = viewModel.loadState {
+        if viewModel.isSignedOut {
+            centered { signedOut }
+        } else if case .failed(let message) = viewModel.loadState {
             centered { statusText(message, systemImage: "exclamationmark.triangle") }
         } else if !viewModel.results.isEmpty {
             resultsList
@@ -320,7 +331,7 @@ struct QuickAccessView: View {
             .frame(height: Self.statusAreaHeight)
     }
 
-    static let statusAreaHeight: CGFloat = 120
+    static let statusAreaHeight: CGFloat = 140
 
     private func statusText(_ message: String, systemImage: String) -> some View {
         VStack(spacing: 8) {
@@ -329,6 +340,40 @@ struct QuickAccessView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(24)
+    }
+
+    @ViewBuilder
+    private var signedOut: some View {
+        VStack(spacing: 10) {
+            if viewModel.isRecovering {
+                ProgressView().controlSize(.small)
+                Text(viewModel.canReconnect ? "Reconnecting…" : "Waiting for sign in…")
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                if !viewModel.canReconnect {
+                    Text("Finish signing in in your browser").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    Button("Cancel") { viewModel.cancelRecovery() }
+                        .buttonStyle(.link).font(.system(size: 11))
+                }
+            } else {
+                Image(systemName: "person.crop.circle.badge.exclamationmark")
+                    .font(.system(size: 22)).foregroundStyle(.secondary)
+                Text(QuickAccessViewModel.signedOutMessage)
+                    .font(.system(size: 13, weight: .medium))
+                if viewModel.canReconnect {
+                    Button("Reconnect") { viewModel.requestReconnect() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
+                    Button("Sign in with browser") { viewModel.requestSignIn() }
+                        .buttonStyle(.link).font(.system(size: 11))
+                } else {
+                    Button("Sign in to Proton Pass") { viewModel.requestSignIn() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
+                    Text("Opens Proton's login in your browser").font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .padding(20)
     }
 }
 

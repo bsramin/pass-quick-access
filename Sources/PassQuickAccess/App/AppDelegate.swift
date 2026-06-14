@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var controller: QuickAccessController?
     private var agentController: AgentProxyController?
+    private var reconnector: PATReconnector?
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -21,13 +22,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let controller = QuickAccessController(client: PassCLIClient(executable: executable))
+        let client = PassCLIClient(executable: executable)
+        let reconnector = PATReconnector(client: client)
+        self.reconnector = reconnector
+
+        let controller = QuickAccessController(client: client, executable: executable, reconnector: reconnector)
         controller.registerHotkey()
         controller.preloadIndexIfUnlocked()
         self.controller = controller
 
-        let agent = AgentProxyController(executable: executable)
+        let agent = AgentProxyController(executable: executable, reconnector: reconnector)
         self.agentController = agent
+        controller.onSessionRestored = { [weak agent] in await agent?.recover() }
         if UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled) {
             Task { await agent.start() }
         }
@@ -110,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "Settings"
-        window.contentView = NSHostingView(rootView: SettingsView(agentController: agentController))
+        window.contentView = NSHostingView(rootView: SettingsView(agentController: agentController, reconnector: reconnector))
         window.isReleasedWhenClosed = false
         window.center()
         return window

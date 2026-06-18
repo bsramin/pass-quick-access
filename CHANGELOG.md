@@ -1,5 +1,23 @@
 # Changelog
 
+## v2026-06-18.1
+
+### Fixed
+- Stop the Proton Pass session from dropping on its own. Opening the panel
+  indexed every vault with several `pass-cli` processes at once, and because
+  they share one session they raced Proton's token refresh — the first to
+  refresh invalidated the token the others still held, signing you out. The
+  reconnect then re-indexed and raced again, which is why you'd get two or three
+  Touch ID prompts back to back. The app now runs `pass-cli` one process at a
+  time, so the session stays put.
+- Keep the SSH agent working after a session refresh. The upstream `pass-cli`
+  agent would keep signing with a stale session (`Permission denied
+  (publickey)`), and since its socket was still reachable the recovery never
+  restarted it — the only workaround was toggling the agent off and on in
+  Settings. Recovery now restarts the agent unconditionally, and it heals itself
+  when a signature is rejected or the agent goes unreachable, so `git` and `ssh`
+  keep working without a visit to Settings.
+
 ## v2026-06-14.1
 
 ### Added

@@ -14,6 +14,13 @@ actor PassCLIClient {
     private let timeout: Duration
     private let decoder = JSONDecoder()
 
+    /// Gate that lets only one `pass-cli` process run at a time. The actor alone
+    /// can't guarantee this: every `execute` suspends on `await runner.run`, and
+    /// the actor reenters there, so without the gate concurrent callers (an index
+    /// fan-out, a prefetch, a TOTP read) spawn overlapping processes.
+    private var isExecuting = false
+    private var executionWaiters: [CheckedContinuation<Void, Never>] = []
+
     init(executable: URL, runner: ProcessRunning = SystemProcessRunner(), timeout: Duration = .seconds(15)) {
         self.executable = executable
         self.runner = runner
@@ -70,20 +77,17 @@ actor PassCLIClient {
         return response.vaults
     }
 
-    /// Builds the full login index by listing every vault concurrently. `item
-    /// list` is always vault-scoped, so this is the only way to see everything.
+    /// Builds the full login index by listing every vault. `item list` is always
+    /// vault-scoped, so this is the only way to see everything. The listings run
+    /// one after another on purpose: a concurrent fan-out spawns several `pass-cli`
+    /// processes at once, and they race each other's session-token refresh, which
+    /// drops the session out from under the user.
     func indexLoginItems() async throws -> [ItemSummary] {
-        let vaults = try await vaults()
-        return try await withThrowingTaskGroup(of: [ItemSummary].self) { group in
-            for vault in vaults {
-                group.addTask { try await self.loginItems(in: vault) }
-            }
-            var items: [ItemSummary] = []
-            for try await chunk in group {
-                items.append(contentsOf: chunk)
-            }
-            return items
+        var items: [ItemSummary] = []
+        for vault in try await vaults() {
+            items.append(contentsOf: try await loginItems(in: vault))
         }
+        return items
     }
 
     /// Active login items in one vault, projected to metadata. `--show-secrets`
@@ -146,12 +150,37 @@ actor PassCLIClient {
     }
 
     private func execute(_ arguments: [String], environment: [String: String]? = nil) async throws -> ProcessResult {
+        await acquireExecutionSlot()
+        defer { releaseExecutionSlot() }
+
         let result = try await runner.run(executable: executable, arguments: arguments, environment: environment, timeout: timeout)
         guard result.status == 0 else {
             let stderr = String(decoding: result.stderr, as: UTF8.self)
             throw PassCLIError.commandFailed(status: result.status, stderr: stderr)
         }
         return result
+    }
+
+    /// Suspends until the single execution slot is free, so only one `pass-cli`
+    /// process is ever in flight. Callers must pair this with `releaseExecutionSlot`.
+    /// A waiting caller resumes only when the slot reaches it; a cancelled task
+    /// still resumes there (the continuation is handed on exactly once) and its
+    /// caller drops the result, so the queue can't stall.
+    private func acquireExecutionSlot() async {
+        guard isExecuting else {
+            isExecuting = true
+            return
+        }
+        await withCheckedContinuation { executionWaiters.append($0) }
+    }
+
+    /// Hands the slot to the next waiter, or marks it free when none are queued.
+    private func releaseExecutionSlot() {
+        if executionWaiters.isEmpty {
+            isExecuting = false
+        } else {
+            executionWaiters.removeFirst().resume()
+        }
     }
 }
 

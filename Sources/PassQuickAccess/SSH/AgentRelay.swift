@@ -12,6 +12,10 @@ struct AgentRelay: Sendable {
     let authorizer: SignAuthorizer
     let keyNameCache: KeyLabelCache
     let identifier: ProcessInspector
+    /// Called when the upstream agent can't be reached or rejects a signature we
+    /// approved, signalling that its `pass-cli` session has gone stale. The owner
+    /// uses it to restart the daemon so the next attempt succeeds.
+    var onUpstreamFailure: @Sendable () -> Void = {}
 
     /// Requests that add, remove, lock or unlock keys. This proxy is read and
     /// sign only, so it refuses them instead of letting a client reshape the agent.
@@ -26,7 +30,9 @@ struct AgentRelay: Sendable {
         do {
             upstreamFD = try UnixSocket.connect(to: upstreamPath)
         } catch {
-            // No upstream agent: fail the client's first request cleanly.
+            // No upstream agent: fail the client's first request cleanly, and ask
+            // the owner to bring the daemon back so the next attempt connects.
+            onUpstreamFailure()
             _ = UnixSocket.writeAll(AgentMessage(type: .failure).encoded(), to: clientFD)
             return
         }
@@ -86,7 +92,15 @@ struct AgentRelay: Sendable {
 
         let allowed = waitFor { await authorizer.authorize(request) }
         guard allowed else { return AgentMessage(type: .failure) }
-        return forward(message, to: upstreamFD)
+
+        let reply = forward(message, to: upstreamFD)
+        // We approved this signature, so a failure (or a dropped reply) comes from
+        // the upstream agent, not the user — its session has likely gone stale.
+        // Heal the daemon so the client's retry signs cleanly.
+        if reply == nil || reply?.type == .failure {
+            onUpstreamFailure()
+        }
+        return reply
     }
 
     /// The human name for a key, from the snoop cache, or by asking the upstream

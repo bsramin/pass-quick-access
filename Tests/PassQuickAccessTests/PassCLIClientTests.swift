@@ -43,7 +43,7 @@ final class PassCLIClientTests: XCTestCase {
         XCTAssertEqual(bare.urls, [])
     }
 
-    func testIndexFansOutAcrossEveryVault() async throws {
+    func testIndexCoversEveryVault() async throws {
         let runner = FakeProcessRunner { arguments in
             if arguments.contains("vault") {
                 return .ok("""
@@ -62,6 +62,24 @@ final class PassCLIClientTests: XCTestCase {
 
         XCTAssertEqual(Set(items.map(\.shareID)), ["sa", "sb"])
         XCTAssertEqual(items.count, 2)
+    }
+
+    func testExecutionsNeverOverlap() async throws {
+        // pass-cli shares one session across every process, and Proton rotates the
+        // session token on use, so two processes at once race that rotation and log
+        // the user out. The client must run them strictly one at a time.
+        let runner = ConcurrencyProbeRunner(stdout: "hunter2")
+        let client = PassCLIClient(executable: executable, runner: runner)
+
+        await withTaskGroup(of: Void.self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    _ = try? await client.password(for: ItemReference(shareID: "s1", itemID: "i\(index)"))
+                }
+            }
+        }
+
+        XCTAssertEqual(runner.maxConcurrent, 1, "pass-cli processes must never overlap")
     }
 
     func testPasswordIsTrimmedAndConcealed() async throws {
@@ -163,6 +181,28 @@ private struct FakeProcessRunner: ProcessRunning {
 
     func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult {
         handler(arguments)
+    }
+}
+
+/// Tracks how many `run` calls are in flight at once, so a test can prove the
+/// client serializes them. Each call lingers briefly to widen the window an
+/// overlap would land in.
+private final class ConcurrencyProbeRunner: ProcessRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = 0
+    private(set) var maxConcurrent = 0
+    private let stdout: String
+
+    init(stdout: String) { self.stdout = stdout }
+
+    func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult {
+        lock.withLock {
+            current += 1
+            maxConcurrent = max(maxConcurrent, current)
+        }
+        try? await Task.sleep(for: .milliseconds(20))
+        lock.withLock { current -= 1 }
+        return ProcessResult(status: 0, stdout: Data(stdout.utf8), stderr: Data())
     }
 }
 

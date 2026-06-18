@@ -33,6 +33,12 @@ final class AgentProxyController: ObservableObject {
     private let infoCoordinator = SignInfoCoordinator()
     private var listener: AgentSocketListener?
 
+    /// Debounce for `autoRecover`, so a flurry of failed signatures restarts the
+    /// daemon once rather than repeatedly.
+    private var isAutoRecovering = false
+    private var lastAutoRecover: Date?
+    private let autoRecoverCooldown: TimeInterval = 5
+
     init(executable: URL, reconnector: PATReconnector? = nil) {
         self.executable = executable
         // After an SSH approval, reuse that Touch ID to restore a dropped session
@@ -64,7 +70,10 @@ final class AgentProxyController: ObservableObject {
             upstreamPath: upstreamPath,
             authorizer: authorizer,
             keyNameCache: KeyLabelCache(),
-            identifier: ProcessInspector()
+            identifier: ProcessInspector(),
+            onUpstreamFailure: { [weak self] in
+                Task { @MainActor in self?.autoRecover() }
+            }
         )
 
         let listener = AgentSocketListener(path: UnixSocket.defaultProxyPath) { fd in
@@ -94,19 +103,42 @@ final class AgentProxyController: ObservableObject {
     /// Brings the agent back after the `pass-cli` session was restored. A logged-out
     /// session leaves the upstream daemon unable to serve keys, so this restarts it;
     /// if the proxy itself isn't up yet (agent enabled mid-session) it starts fresh.
+    /// The restart is unconditional: the daemon's socket often still answers while
+    /// it serves keys from the now-stale session, so just checking reachability
+    /// would leave signatures broken.
     func recover() async {
         guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled) else { return }
         guard listener != nil else {
             await start()
             return
         }
+        await restartDaemon()
+    }
+
+    /// Restarts the upstream daemon in the background when the relay reports that a
+    /// signature failed or the daemon is unreachable. This heals a daemon left on a
+    /// stale session without the user toggling the agent off and on. Debounced, so a
+    /// burst of failed signatures triggers a single restart rather than a storm.
+    private func autoRecover() {
+        guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled), listener != nil else { return }
+        guard !isAutoRecovering else { return }
+        if let last = lastAutoRecover, Date().timeIntervalSince(last) < autoRecoverCooldown { return }
+        isAutoRecovering = true
+        lastAutoRecover = Date()
+        Task {
+            await restartDaemon()
+            isAutoRecovering = false
+        }
+    }
+
+    private func restartDaemon() async {
         status = .starting
         let daemon = UpstreamDaemonManager(
             executable: executable,
             socketPath: configuredUpstreamPath(),
             vaultFilter: vaultFilter()
         )
-        status = await daemon.ensureRunning() ? .running : .upstreamUnavailable
+        status = await daemon.restart() ? .running : .upstreamUnavailable
     }
 
     /// Applies the "set SSH_AUTH_SOCK" toggle immediately.

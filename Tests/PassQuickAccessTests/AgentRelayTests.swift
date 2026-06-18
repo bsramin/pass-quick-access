@@ -22,7 +22,10 @@ private final class FakeUpstream: @unchecked Sendable {
         return _received
     }
 
-    init() {
+    private let failSignatures: Bool
+
+    init(failSignatures: Bool = false) {
+        self.failSignatures = failSignatures
         path = "/tmp/pqa-up-\(UUID().uuidString.prefix(8)).sock"
     }
 
@@ -33,8 +36,9 @@ private final class FakeUpstream: @unchecked Sendable {
             let client = accept(fd, nil, nil)
             guard client >= 0 else { return }
             while let message = try? AgentMessage.read(from: client) {
-                self?.record(message)
-                let reply = Self.reply(to: message)
+                guard let self else { break }
+                self.record(message)
+                let reply = self.reply(to: message)
                 _ = UnixSocket.writeAll(reply.encoded(), to: client)
             }
             close(client)
@@ -48,6 +52,13 @@ private final class FakeUpstream: @unchecked Sendable {
 
     private func record(_ message: AgentMessage) {
         lock.lock(); _received.append(message); lock.unlock()
+    }
+
+    private func reply(to message: AgentMessage) -> AgentMessage {
+        if failSignatures, message.type == .signRequest {
+            return AgentMessage(type: .failure)
+        }
+        return Self.reply(to: message)
     }
 
     private static func reply(to message: AgentMessage) -> AgentMessage {
@@ -73,8 +84,21 @@ private final class FakeUpstream: @unchecked Sendable {
     }
 }
 
+/// Records whether the relay asked for a daemon restart, across the relay's
+/// connection thread and the test thread.
+private final class HealFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    func fire() { lock.withLock { fired = true } }
+    var didFire: Bool { lock.withLock { fired } }
+}
+
 final class AgentRelayTests: XCTestCase {
-    private func makeProxy(upstream: String, allow: Bool) -> AgentRelay {
+    private func makeProxy(
+        upstream: String,
+        allow: Bool,
+        onUpstreamFailure: @escaping @Sendable () -> Void = {}
+    ) -> AgentRelay {
         AgentRelay(
             upstreamPath: upstream,
             authorizer: SignAuthorizer(
@@ -83,7 +107,8 @@ final class AgentRelayTests: XCTestCase {
                 presenter: StaticPresenter(allow: allow)
             ),
             keyNameCache: KeyLabelCache(),
-            identifier: ProcessInspector()
+            identifier: ProcessInspector(),
+            onUpstreamFailure: onUpstreamFailure
         )
     }
 
@@ -172,6 +197,47 @@ final class AgentRelayTests: XCTestCase {
         close(pair.mine)
         Thread.sleep(forTimeInterval: 0.2)
         XCTAssertFalse(upstream.received.contains { $0.rawType == 17 }, "key management must not reach upstream")
+    }
+
+    func testUnreachableUpstreamRequestsHeal() throws {
+        // No upstream agent listening: the relay should fail the request and ask
+        // its owner to bring the daemon back, instead of staying silently broken.
+        let healed = HealFlag()
+        let proxy = makeProxy(
+            upstream: "/tmp/pqa-missing-\(UUID().uuidString.prefix(8)).sock",
+            allow: true,
+            onUpstreamFailure: { healed.fire() }
+        )
+        let pair = try makeClientPair()
+        DispatchQueue.global().async { proxy.handle(clientFD: pair.proxy) }
+
+        XCTAssertTrue(UnixSocket.writeAll(AgentMessage(type: .requestIdentities).encoded(), to: pair.mine))
+        let reply = try AgentMessage.read(from: pair.mine)
+        XCTAssertEqual(reply?.type, .failure)
+
+        close(pair.mine)
+        XCTAssertTrue(healed.didFire, "an unreachable upstream must request a daemon restart")
+    }
+
+    func testFailedSignatureRequestsHeal() throws {
+        // The upstream is reachable but rejects signatures, as a daemon on a stale
+        // session does. Since we approved the signature, the relay should read the
+        // failure as the daemon's and ask for a restart so the retry succeeds.
+        let upstream = FakeUpstream(failSignatures: true)
+        try upstream.start()
+        defer { upstream.stop() }
+
+        let healed = HealFlag()
+        let proxy = makeProxy(upstream: upstream.path, allow: true, onUpstreamFailure: { healed.fire() })
+        let pair = try makeClientPair()
+        DispatchQueue.global().async { proxy.handle(clientFD: pair.proxy) }
+
+        XCTAssertTrue(UnixSocket.writeAll(signRequest(keyBlob: [0xab]).encoded(), to: pair.mine))
+        let reply = try AgentMessage.read(from: pair.mine)
+        XCTAssertEqual(reply?.type, .failure)
+
+        close(pair.mine)
+        XCTAssertTrue(healed.didFire, "a failed signature must request a daemon restart")
     }
 
     func testDeniedSignNeverReachesUpstream() throws {

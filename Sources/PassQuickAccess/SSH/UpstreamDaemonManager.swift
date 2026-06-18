@@ -28,7 +28,15 @@ struct UpstreamDaemonManager: Sendable {
     /// Returns whether the socket is reachable when it finishes.
     func ensureRunning() async -> Bool {
         if isReachable() { return true }
+        return await restart()
+    }
 
+    /// Stops and restarts the daemon unconditionally, even when its socket still
+    /// answers. A reachable socket isn't enough after the `pass-cli` session has
+    /// rotated: the daemon holds the old session in memory and keeps signing with
+    /// it, so signatures fail ("Permission denied") until it's restarted with the
+    /// current session. Returns whether the socket is reachable when it finishes.
+    func restart() async -> Bool {
         // A daemon can linger in a "degraded" state (process alive, socket gone),
         // and that blocks a fresh `start` with "already running". Stop first so the
         // restart can recreate the socket; harmless when nothing is running.

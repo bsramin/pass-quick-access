@@ -14,6 +14,7 @@ final class QuickAccessController {
     private let largeType = LargeTypeWindowController()
     private let recovery: SessionRecovery
     private let reconnector: PATReconnector
+    private let updateController: UpdateController
     private let webLogin: WebLogin
     private var panel: QuickAccessPanel?
     private var previousApp: NSRunningApplication?
@@ -30,9 +31,10 @@ final class QuickAccessController {
 
     private let panelWidth: CGFloat = 640
 
-    init(client: PassCLIClient, executable: URL, reconnector: PATReconnector) {
+    init(client: PassCLIClient, executable: URL, reconnector: PATReconnector, updateController: UpdateController) {
         self.recovery = SessionRecovery(client: client)
         self.reconnector = reconnector
+        self.updateController = updateController
         self.webLogin = WebLogin(executable: executable)
         viewModel = QuickAccessViewModel(client: client)
         viewModel.onDismiss = { [weak self] in self?.hide() }
@@ -182,7 +184,7 @@ final class QuickAccessController {
     }
 
     private func makeContentView() -> NSView {
-        NSHostingView(rootView: QuickAccessView(viewModel: viewModel))
+        NSHostingView(rootView: QuickAccessView(viewModel: viewModel, updateController: updateController))
     }
 
     /// The fixed top-left point the panel grows from, in the screen under the

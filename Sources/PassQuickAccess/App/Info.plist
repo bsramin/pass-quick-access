@@ -27,5 +27,20 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock Pass Quick Access with Touch ID.</string>
+	<!-- Sparkle updater. The app checks this appcast at launch and every two
+	     hours; see SECURITY.md. SUPublicEDKey is the public half of the EdDSA
+	     signing key; the private half lives in the maintainer's Keychain and the
+	     CI secret (see RELEASING.md). -->
+	<key>SUFeedURL</key>
+	<string>https://bsramin.github.io/pass-quick-access/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>5kt1ydY8Q8NxORgBgI0L7jyAuz3p429znTqARCCS+S8=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUEnableInstallerLauncherService</key>
+	<false/>
+	<!-- Don't send any system profile with the update check; it's a bare GET. -->
+	<key>SUEnableSystemProfiling</key>
+	<false/>
 </dict>
 </plist>

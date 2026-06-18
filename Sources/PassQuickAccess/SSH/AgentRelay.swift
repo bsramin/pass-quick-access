@@ -95,7 +95,7 @@ struct AgentRelay: Sendable {
 
         let reply = forward(message, to: upstreamFD)
         // We approved this signature, so a failure (or a dropped reply) comes from
-        // the upstream agent, not the user — its session has likely gone stale.
+        // the upstream agent, not the user, and its session has likely gone stale.
         // Heal the daemon so the client's retry signs cleanly.
         if reply == nil || reply?.type == .failure {
             onUpstreamFailure()

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct QuickAccessView: View {
     @ObservedObject var viewModel: QuickAccessViewModel
+    @ObservedObject var updateController: UpdateController
     @FocusState private var searchFocused: Bool
     @State private var flashing = false
 
@@ -117,6 +118,10 @@ struct QuickAccessView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 18, weight: .regular))
                 .focused($searchFocused)
+            if updateController.available != nil {
+                UpdatePill()
+                    .onTapGesture { updateController.showReleaseNotes() }
+            }
         }
         .padding(.horizontal, 16)
         .frame(height: 52)
@@ -151,7 +156,7 @@ struct QuickAccessView: View {
                 .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
             if !viewModel.query.isEmpty {
-                Text("Still indexing — what you're after may not have loaded yet")
+                Text("Still indexing, so what you're after may not have loaded yet")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }

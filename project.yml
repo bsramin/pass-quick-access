@@ -9,6 +9,11 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: "2.0.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    # Pinned to an exact version (supply chain): a new Sparkle release is taken
+    # only after a deliberate bump here, never resolved automatically.
+    exactVersion: "2.9.3"
 
 settings:
   base:
@@ -27,6 +32,7 @@ targets:
       - path: Sources/PassQuickAccess
     dependencies:
       - package: KeyboardShortcuts
+      - package: Sparkle
     # Signing lives in Config/Signing.xcconfig (ad-hoc by default), which pulls
     # in a git-ignored Config/Local.xcconfig if you want to sign with your own
     # identity.

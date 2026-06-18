@@ -4,9 +4,9 @@
 
 ### Changed
 - Show vault items as they load instead of waiting for the whole index. Vaults
-  are read one at a time — running `pass-cli` in parallel races the session
-  token and signs you out — so with many vaults the panel used to sit on a
-  spinner for several seconds. It now fills in vault by vault, with a count of
+  are read one at a time (running `pass-cli` in parallel races the session token
+  and signs you out), so with many vaults the panel used to sit on a spinner for
+  several seconds. It now fills in vault by vault, with a count of
   how far along it is, so you can start searching straight away. While the index
   is still coming in, a search with no match yet keeps showing that it's
   indexing rather than saying "No matches", so an item in a vault that hasn't
@@ -17,7 +17,7 @@
 ### Fixed
 - Stop the Proton Pass session from dropping on its own. Opening the panel
   indexed every vault with several `pass-cli` processes at once, and because
-  they share one session they raced Proton's token refresh — the first to
+  they share one session they raced Proton's token refresh: the first to
   refresh invalidated the token the others still held, signing you out. The
   reconnect then re-indexed and raced again, which is why you'd get two or three
   Touch ID prompts back to back. The app now runs `pass-cli` one process at a
@@ -25,7 +25,7 @@
 - Keep the SSH agent working after a session refresh. The upstream `pass-cli`
   agent would keep signing with a stale session (`Permission denied
   (publickey)`), and since its socket was still reachable the recovery never
-  restarted it — the only workaround was toggling the agent off and on in
+  restarted it, so the only workaround was toggling the agent off and on in
   Settings. Recovery now restarts the agent unconditionally, and it heals itself
   when a signature is rejected or the agent goes unreachable, so `git` and `ssh`
   keep working without a visit to Settings.

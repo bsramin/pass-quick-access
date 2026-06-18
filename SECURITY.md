@@ -22,6 +22,26 @@ access to an unlocked Mac, not local code execution.
 
 See the security model section of the [README](README.md) for more detail.
 
+## Update checks
+
+The app checks for new versions with [Sparkle](https://sparkle-project.org). At
+launch, and then every two hours, it makes one plain HTTPS GET for the appcast at
+`https://bsramin.github.io/pass-quick-access/appcast.xml`, a static file on
+GitHub Pages. The request carries no account data and no system profile. The only
+thing it reveals is the standard Sparkle user agent, which is the app version and
+the macOS version, both already known to GitHub. Seeing this request on the
+network is expected and not a sign of anything wrong, and blocking that host
+turns the check off without breaking the app.
+
+Nothing installs on its own. When a newer version exists the app shows a small
+"Update" pill and waits; it downloads and replaces the app only after you pick
+"Update Now". Every update is verified against an ed25519 (EdDSA) public key
+pinned inside the app before it is allowed to install, so a tampered or
+intercepted download is rejected even though the build itself is not notarized.
+The private half of the signing key lives only in the maintainer's Keychain and a
+GitHub Actions secret, and the release workflow that uses it runs only when a
+maintainer publishes a release, never from a pull request.
+
 ## Scope
 
 This policy covers the Pass Quick Access app in this repository. Issues in

@@ -7,6 +7,13 @@ on:
 permissions:
   contents: write
 
+env:
+  # Sparkle command-line tools (sign_update) are downloaded at this version, and
+  # the download is checked against this hash before it runs, because this job
+  # holds the signing key and must not execute an unverified binary.
+  SPARKLE_VERSION: "2.9.3"
+  SPARKLE_SHA256: "74a07da821f92b79310009954c0e15f350173374a3abe39095b4fc5096916be6"
+
 jobs:
   release:
     # Build against the latest SDK so the shipped app gets the current UI look.
@@ -17,7 +24,20 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Derive versions from the tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # Tag v2026-06-19.1 -> build number 20260619.1, which climbs with the
+          # date so Sparkle always treats a newer release as an upgrade.
+          stripped="${TAG#v}"
+          build="${stripped//-/}"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
       - name: Build release artifact
+        env:
+          PQA_BUILD_VERSION: ${{ steps.version.outputs.build }}
         run: ./scripts/build-release.sh
 
       - name: Attach artifact to the release
@@ -25,3 +45,50 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" dist/PassQuickAccess.zip --clobber
+
+      - name: Sign the update
+        id: sign
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          curl -fsSL -o sparkle.tar.xz \
+            "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          echo "${SPARKLE_SHA256}  sparkle.tar.xz" | shasum -a 256 -c -
+          mkdir sparkle-tools
+          tar -xJf sparkle.tar.xz -C sparkle-tools
+          out="$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | sparkle-tools/bin/sign_update --ed-key-file - dist/PassQuickAccess.zip)"
+          echo "signature=$(echo "$out" | sed -E 's/.*sparkle:edSignature="([^"]+)".*/\1/')" >> "$GITHUB_OUTPUT"
+          echo "length=$(echo "$out" | sed -E 's/.*length="([0-9]+)".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Update the appcast on the default branch
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          BUILD: ${{ steps.version.outputs.build }}
+          SIGNATURE: ${{ steps.sign.outputs.signature }}
+          LENGTH: ${{ steps.sign.outputs.length }}
+          NOTES: ${{ github.event.release.body }}
+          REPO: ${{ github.repository }}
+        run: |
+          short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            dist/dd/Build/Products/Release/PassQuickAccess.app/Contents/Info.plist)"
+
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+
+          APPCAST="docs/appcast.xml" \
+          TITLE="$TAG" \
+          VERSION="$BUILD" \
+          SHORT_VERSION="$short" \
+          URL="https://github.com/${REPO}/releases/download/${TAG}/PassQuickAccess.zip" \
+          SIGNATURE="$SIGNATURE" \
+          LENGTH="$LENGTH" \
+          MIN_SYSTEM="14.0" \
+          PUBDATE="$(date -u +'%a, %d %b %Y %H:%M:%S +0000')" \
+          python3 scripts/update-appcast.py
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/appcast.xml
+          git commit -m "Publish $TAG to the appcast"
+          git push origin main

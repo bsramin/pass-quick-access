@@ -77,17 +77,34 @@ actor PassCLIClient {
         return response.vaults
     }
 
-    /// Builds the full login index by listing every vault. `item list` is always
-    /// vault-scoped, so this is the only way to see everything. The listings run
-    /// one after another on purpose: a concurrent fan-out spawns several `pass-cli`
-    /// processes at once, and they race each other's session-token refresh, which
-    /// drops the session out from under the user.
-    func indexLoginItems() async throws -> [ItemSummary] {
-        var items: [ItemSummary] = []
-        for vault in try await vaults() {
-            items.append(contentsOf: try await loginItems(in: vault))
+    /// Streams the login index one vault at a time. Listing everything needs one
+    /// `pass-cli item list` per vault (the command is always vault-scoped), and
+    /// those run strictly one after another: in parallel they race each other's
+    /// session-token refresh and drop the session out from under the user. Yielding
+    /// a vault as soon as it's read lets the caller show its items immediately
+    /// instead of blocking on all of them, which matters when there are many.
+    nonisolated func indexLoginItems() -> AsyncThrowingStream<IndexedVault, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let vaults = try await self.vaults()
+                    for (offset, vault) in vaults.enumerated() {
+                        try Task.checkCancellation()
+                        let items = try await self.loginItems(in: vault)
+                        continuation.yield(IndexedVault(
+                            vaultName: vault.name,
+                            position: offset + 1,
+                            total: vaults.count,
+                            items: items
+                        ))
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
         }
-        return items
     }
 
     /// Active login items in one vault, projected to metadata. `--show-secrets`

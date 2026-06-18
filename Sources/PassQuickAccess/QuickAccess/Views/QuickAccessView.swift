@@ -132,10 +132,29 @@ struct QuickAccessView: View {
             centered { statusText(message, systemImage: "exclamationmark.triangle") }
         } else if !viewModel.results.isEmpty {
             resultsList
+        } else if viewModel.isIndexing {
+            // Still streaming vaults in: a query with no match yet might just be in
+            // a vault that hasn't arrived. Keep the loader so it doesn't read as
+            // "not found" before the index is complete.
+            centered { loading }
         } else if viewModel.loadState == .ready {
             centered { statusText("No matches", systemImage: "magnifyingglass") }
         } else {
-            centered { ProgressView().controlSize(.small) }
+            centered { loading }
+        }
+    }
+
+    private var loading: some View {
+        VStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(viewModel.loadingDetail ?? "Loading your items")
+                .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+            if !viewModel.query.isEmpty {
+                Text("Still indexing — what you're after may not have loaded yet")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -171,9 +190,16 @@ struct QuickAccessView: View {
 
     private var listFooter: some View {
         footerBar {
-            hint("→", "Actions")
-            hint("⌘C", "Username")
-            hint("⌘⇧C", "Password")
+            if viewModel.isIndexing {
+                ProgressView().controlSize(.small).scaleEffect(0.6)
+                Text(viewModel.loadingDetail ?? "Indexing…")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.primary)
+            } else {
+                hint("→", "Actions")
+                hint("⌘C", "Username")
+                hint("⌘⇧C", "Password")
+            }
             Spacer()
             hint("esc", "Close")
         }

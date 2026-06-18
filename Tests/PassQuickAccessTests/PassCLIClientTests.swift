@@ -44,24 +44,30 @@ final class PassCLIClientTests: XCTestCase {
     }
 
     func testIndexCoversEveryVault() async throws {
-        let runner = FakeProcessRunner { arguments in
-            if arguments.contains("vault") {
-                return .ok("""
-                {"vaults": [
-                  {"name": "A", "vault_id": "va", "share_id": "sa"},
-                  {"name": "B", "vault_id": "vb", "share_id": "sb"}
-                ]}
-                """)
-            }
-            let share = arguments.firstValue(after: "--share-id") ?? "?"
-            return .ok(singleLoginJSON(share: share))
-        }
-        let client = PassCLIClient(executable: executable, runner: runner)
+        let client = PassCLIClient(executable: executable, runner: twoVaultRunner())
 
-        let items = try await client.indexLoginItems()
+        var items: [ItemSummary] = []
+        for try await vault in client.indexLoginItems() {
+            items.append(contentsOf: vault.items)
+        }
 
         XCTAssertEqual(Set(items.map(\.shareID)), ["sa", "sb"])
         XCTAssertEqual(items.count, 2)
+    }
+
+    func testIndexStreamsOneVaultAtATime() async throws {
+        let client = PassCLIClient(executable: executable, runner: twoVaultRunner())
+
+        var positions: [Int] = []
+        var totals: [Int] = []
+        for try await vault in client.indexLoginItems() {
+            positions.append(vault.position)
+            totals.append(vault.total)
+            XCTAssertEqual(vault.items.count, 1, "each chunk carries just its own vault's items")
+        }
+
+        XCTAssertEqual(positions, [1, 2], "vaults arrive in order, one at a time")
+        XCTAssertEqual(totals, [2, 2])
     }
 
     func testExecutionsNeverOverlap() async throws {
@@ -136,6 +142,22 @@ final class PassCLIClientTests: XCTestCase {
 }
 
 // MARK: - Fixtures
+
+/// Two vaults, each with a single login item, so a test can drive the index.
+private func twoVaultRunner() -> FakeProcessRunner {
+    FakeProcessRunner { arguments in
+        if arguments.contains("vault") {
+            return .ok("""
+            {"vaults": [
+              {"name": "A", "vault_id": "va", "share_id": "sa"},
+              {"name": "B", "vault_id": "vb", "share_id": "sb"}
+            ]}
+            """)
+        }
+        let share = arguments.firstValue(after: "--share-id") ?? "?"
+        return .ok(singleLoginJSON(share: share))
+    }
+}
 
 private let loginListJSON = """
 {"items": [

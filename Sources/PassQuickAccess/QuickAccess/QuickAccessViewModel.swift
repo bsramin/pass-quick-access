@@ -54,6 +54,14 @@ final class QuickAccessViewModel: ObservableObject {
         didSet { if selection != oldValue { schedulePasswordPrefetch() } }
     }
     @Published private(set) var loadState: LoadState = .idle
+    /// What the index is doing right now, shown under the loading spinner and in
+    /// the list footer. Vaults are read one at a time (running `pass-cli` in
+    /// parallel drops the session), so this tells the user the wait is the vaults
+    /// indexing, not a hang.
+    @Published private(set) var loadingDetail: String?
+    /// True while vaults are still streaming in, so the footer can show progress
+    /// even though usable results are already on screen.
+    @Published private(set) var isIndexing = false
     /// True while waiting for a sign-in to land after the user was sent to log in.
     @Published private(set) var isRecovering = false
     /// Whether a stored access token offers a one-tap reconnect from signed-out.
@@ -174,14 +182,32 @@ final class QuickAccessViewModel: ObservableObject {
 
     func reload() async {
         loadState = .loading
+        loadingDetail = nil
+        isIndexing = true
+        defer { isIndexing = false }
+
+        var accumulated: [ItemSummary] = []
         do {
-            index = SearchIndex(items: try await client.indexLoginItems())
+            for try await vault in client.indexLoginItems() {
+                accumulated.append(contentsOf: vault.items)
+                index = SearchIndex(items: accumulated)
+                // Show the first vault's items right away; keep the spinner only
+                // while nothing has come back yet.
+                if !accumulated.isEmpty { loadState = .ready }
+                loadingDetail = vault.position < vault.total
+                    ? "Indexing \(vault.position) of \(vault.total) vaults"
+                    : nil
+                refilterPreservingSelection()
+            }
             loadState = .ready
-            refilter()
+            loadingDetail = nil
+            refilterPreservingSelection()
         } catch let error as PassCLIError where error.isAuthenticationFailure {
-            enterFailure(Self.signedOutMessage)
+            // A vault that's already on screen is more useful than a blank prompt;
+            // only fall back to the signed-out state when nothing was read.
+            if accumulated.isEmpty { enterFailure(Self.signedOutMessage) } else { loadState = .ready }
         } catch {
-            enterFailure(String(describing: error))
+            if accumulated.isEmpty { enterFailure(String(describing: error)) } else { loadState = .ready }
         }
     }
 
@@ -189,6 +215,7 @@ final class QuickAccessViewModel: ObservableObject {
     /// over from before the failure so the panel resizes and drops the footer.
     private func enterFailure(_ message: String) {
         loadState = .failed(message)
+        loadingDetail = nil
         index = SearchIndex(items: [])
         results = []
         detailItem = nil
@@ -443,5 +470,19 @@ final class QuickAccessViewModel: ObservableObject {
         // Always select the top match: keeping a prior selection would leave the
         // highlight on an item that the new ranking pushed down the list.
         selection = results.first?.id
+    }
+
+    /// Refreshes the result list against the current query as vaults stream in,
+    /// without disturbing the user: it keeps the current selection if it's still
+    /// present (only defaulting to the top match when it's gone) and leaves any
+    /// open detail view in place.
+    private func refilterPreservingSelection() {
+        let previous = selection
+        results = index.search(query, sortOrder: SortOrder.current())
+        if let previous, results.contains(where: { $0.id == previous }) {
+            selection = previous
+        } else {
+            selection = results.first?.id
+        }
     }
 }

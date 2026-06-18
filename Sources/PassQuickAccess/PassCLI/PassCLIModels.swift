@@ -31,6 +31,15 @@ struct ItemReference: Hashable, Sendable {
     let itemID: String
 }
 
+/// One vault's items as the index streams in, with its place in the run so the
+/// caller can show progress while the rest of the vaults are still being read.
+struct IndexedVault: Sendable {
+    let vaultName: String
+    let position: Int
+    let total: Int
+    let items: [ItemSummary]
+}
+
 /// The searchable metadata for a login. Built by projecting a `DetailedItem`
 /// down to non-secret fields; passwords and TOTP secrets are never carried
 /// here; they are fetched fresh at fill time.

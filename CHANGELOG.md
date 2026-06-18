@@ -1,5 +1,17 @@
 # Changelog
 
+## v2026-06-19.1
+
+### Changed
+- Show vault items as they load instead of waiting for the whole index. Vaults
+  are read one at a time — running `pass-cli` in parallel races the session
+  token and signs you out — so with many vaults the panel used to sit on a
+  spinner for several seconds. It now fills in vault by vault, with a count of
+  how far along it is, so you can start searching straight away. While the index
+  is still coming in, a search with no match yet keeps showing that it's
+  indexing rather than saying "No matches", so an item in a vault that hasn't
+  loaded doesn't look missing.
+
 ## v2026-06-18.1
 
 ### Fixed

@@ -3,6 +3,18 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-06-19.3</title>
+      <pubDate>Fri, 19 Jun 2026 00:43:09 +0000</pubDate>
+      <sparkle:version>20260619.3</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>### Fixed
+- Fix a crash on launch. The previous release quit right away with a missing-library error, because the signed build would not load the bundled updater framework. It starts normally again.
+
+**Full Changelog**: https://github.com/bsramin/pass-quick-access/compare/v2026-06-19.2...v2026-06-19.3</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-06-19.3/PassQuickAccess.zip" sparkle:edSignature="o5ONrYdiTrKKB7ymMv3f3tqDe9erB5uTlMGZXsy05xcTtxTdC5rGERycan/96bpT/Gm55xdLxgErtt1NAk35DA==" length="4055476" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-06-19.2</title>
       <pubDate>Fri, 19 Jun 2026 00:28:26 +0000</pubDate>
       <sparkle:version>20260619.2</sparkle:version>

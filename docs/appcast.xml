@@ -3,6 +3,19 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-06-19.4</title>
+      <pubDate>Fri, 19 Jun 2026 01:01:24 +0000</pubDate>
+      <sparkle:version>20260619.4</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>- The first release with a working in-app updater, so new versions arrive as an Update pill instead of a manual download :)
+
+- Show the real release version (the dated one, like 2026-06-19.4) in the update window and the "up to date" message, instead of the marketing version that never changes.
+
+**Full Changelog**: https://github.com/bsramin/pass-quick-access/compare/v2026-06-19.2...v2026-06-19.4</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-06-19.4/PassQuickAccess.zip" sparkle:edSignature="2hoI3R6HyZLklZG+169cegYXOPTyWQHl/VNPPGzZejtWXvBvoPe3BjOTEINlwfnN3PmLW1AF3S18sSQhZbthDg==" length="4058423" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-06-19.3</title>
       <pubDate>Fri, 19 Jun 2026 00:43:09 +0000</pubDate>
       <sparkle:version>20260619.3</sparkle:version>

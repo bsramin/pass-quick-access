@@ -2,5 +2,24 @@
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <title>Pass Quick Access</title>
+    <item>
+      <title>v2026-06-19.2</title>
+      <pubDate>Fri, 19 Jun 2026 00:28:26 +0000</pubDate>
+      <sparkle:version>20260619.2</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>### Added
+- Update itself when a new version is out, without getting in the way. A small
+  "Update" pill shows up next to the menu-bar icon and at the edge of the search
+  bar when a release is available, and the menu gains an "Update Now" item next
+  to a "Check for Updates" one that's always there. Clicking a pill opens the
+  release notes and lets you update on the spot. The check runs quietly at launch
+  and every couple of hours, sends no account data, never installs on its own,
+  and verifies each update's signature before applying it. Block the update host
+  to turn it off (see SECURITY.md).
+
+**Full Changelog**: https://github.com/bsramin/pass-quick-access/compare/v2026-06-19.1...v2026-06-19.2</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-06-19.2/PassQuickAccess.zip" sparkle:edSignature="/4pAUUw17f/uIzNL4jZ3mmF1vHH+q9e1m4vJJoEFIXz8tUqv6wnD9yGfOHVk6+GFJjnnM/ah0R6HZkdZvRKEBQ==" length="4054677" type="application/octet-stream" />
+    </item>
   </channel>
 </rss>

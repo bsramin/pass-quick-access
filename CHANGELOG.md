@@ -1,5 +1,12 @@
 # Changelog
 
+## v2026-06-19.3
+
+### Fixed
+- Fix a crash on launch. The previous release quit right away with a
+  missing-library error, because the signed build would not load the bundled
+  updater framework. It starts normally again.
+
 ## v2026-06-19.2
 
 ### Added

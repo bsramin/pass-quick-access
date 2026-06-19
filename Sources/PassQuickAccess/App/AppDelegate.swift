@@ -124,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // a release build can never surface a fake update.
         #if DEBUG
         if ProcessInfo.processInfo.environment["PQA_MOCK_UPDATE"] == "1" {
-            updateController.present(AvailableUpdate(version: "0.2.0", releaseNotes: Self.mockReleaseNotes))
+            updateController.present(AvailableUpdate(version: "2026-06-20.1", releaseNotes: Self.mockReleaseNotes))
             return
         }
         #endif
@@ -148,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Sample release notes used only by the `PQA_MOCK_UPDATE` development build.
     private static let mockReleaseNotes = """
-    Pass Quick Access 0.2.0
+    Pass Quick Access 2026-06-20.1
 
     Fixed
     - Stop the Proton Pass session from dropping on its own when the panel

@@ -1,5 +1,21 @@
 # Changelog
 
+## v2026-06-19.4
+
+- The first release with a working in-app updater, so new versions arrive as an
+Update pill instead of a manual download.
+
+- Show the real release version (the dated one, like 2026-06-19.4) in the update
+  window and the "up to date" message, instead of the marketing version that
+  never changes.
+
+## v2026-06-19.3
+
+### Fixed
+- Fix a crash on launch. The 2026-06-19.2 release quit right away with a
+  missing-library error, because the signed build would not load the bundled
+  updater framework. It starts normally again.
+
 ## v2026-06-19.2
 
 ### Added

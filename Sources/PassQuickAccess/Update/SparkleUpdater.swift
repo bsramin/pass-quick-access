@@ -54,7 +54,7 @@ final class SparkleUpdater: NSObject {
     private func reportUpToDate() {
         let alert = NSAlert()
         alert.messageText = "You're up to date"
-        alert.informativeText = "Pass Quick Access \(Bundle.main.shortVersion) is the latest version."
+        alert.informativeText = "Pass Quick Access \(ReleaseVersion.current) is the latest version."
         alert.addButton(withTitle: "OK")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -63,8 +63,16 @@ final class SparkleUpdater: NSObject {
 
 extension SparkleUpdater: SPUUpdaterDelegate {
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        let update = AvailableUpdate(version: item.displayVersionString, releaseNotes: item.itemDescription ?? "")
-        DispatchQueue.main.async { [weak self] in self?.controller.present(update) }
+        // Use the dated build number (sparkle:version), not the static marketing
+        // version, so the offered release reads as the one the user recognizes.
+        let update = AvailableUpdate(version: ReleaseVersion.display(item.versionString), releaseNotes: item.itemDescription ?? "")
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.controller.present(update)
+            // A check the user asked for should show what it found, not just light
+            // the pill; a background check stays quiet and only lights the pill.
+            if self.checkWasUserInitiated { self.controller.showReleaseNotes() }
+        }
     }
 
     nonisolated func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
@@ -87,11 +95,5 @@ private final class InstallingUserDriver: SPUStandardUserDriver {
         reply: @escaping (SPUUserUpdateChoice) -> Void
     ) {
         reply(.install)
-    }
-}
-
-private extension Bundle {
-    var shortVersion: String {
-        object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
     }
 }

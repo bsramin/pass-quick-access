@@ -1,5 +1,17 @@
 # Changelog
 
+## v2026-06-19.2
+
+### Added
+- Update itself when a new version is out, without getting in the way. A small
+  "Update" pill shows up next to the menu-bar icon and at the edge of the search
+  bar when a release is available, and the menu gains an "Update Now" item next
+  to a "Check for Updates" one that's always there. Clicking a pill opens the
+  release notes and lets you update on the spot. The check runs quietly at launch
+  and every couple of hours, sends no account data, never installs on its own,
+  and verifies each update's signature before applying it. Block the update host
+  to turn it off (see SECURITY.md).
+
 ## v2026-06-19.1
 
 ### Changed

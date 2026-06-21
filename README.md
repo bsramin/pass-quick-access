@@ -31,6 +31,10 @@ If you or your company would like to help, you can sponsor through
 **[GitHub Sponsors](https://github.com/sponsors/bsramin)**. Your support would be
 credited here with thanks.
 
+Prefer not to sponsor? You can also sign up for Proton with my
+**[referral link](https://pr.tn/ref/H6KQSW71)**. You get 2 weeks of a paid plan,
+and I get a small reward if you subscribe.
+
 ## Screenshots
 
 | Search | Item detail | Settings |

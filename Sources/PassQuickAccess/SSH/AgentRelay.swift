@@ -16,6 +16,17 @@ struct AgentRelay: Sendable {
     /// approved, signalling that its `pass-cli` session has gone stale. The owner
     /// uses it to restart the daemon so the next attempt succeeds.
     var onUpstreamFailure: @Sendable () -> Void = {}
+    /// Restarts the upstream daemon and waits for it, returning whether it came
+    /// back. Called when a new connection finds the upstream gone (often a daemon
+    /// that didn't survive a long idle or a sleep/wake), so this first connection
+    /// heals in place and succeeds instead of failing and forcing a manual toggle.
+    /// The owner coalesces concurrent callers onto one restart.
+    var healUpstream: @Sendable () async -> Bool = { false }
+
+    /// How long to wait for an upstream reply before treating the connection as
+    /// wedged. A daemon that accepts the socket but never answers must not pin this
+    /// connection's thread forever; the stalled read fails and heals instead.
+    static let upstreamReadTimeout: TimeInterval = 20
 
     /// Requests that add, remove, lock or unlock keys. This proxy is read and
     /// sign only, so it refuses them instead of letting a client reshape the agent.
@@ -26,16 +37,7 @@ struct AgentRelay: Sendable {
     func handle(clientFD: Int32) {
         defer { close(clientFD) }
 
-        let upstreamFD: Int32
-        do {
-            upstreamFD = try UnixSocket.connect(to: upstreamPath)
-        } catch {
-            // No upstream agent: fail the client's first request cleanly, and ask
-            // the owner to bring the daemon back so the next attempt connects.
-            onUpstreamFailure()
-            _ = UnixSocket.writeAll(AgentMessage(type: .failure).encoded(), to: clientFD)
-            return
-        }
+        guard let upstreamFD = openUpstream(for: clientFD) else { return }
         defer { close(upstreamFD) }
 
         // Captured once per connection: the peer can't change behind a fd.
@@ -56,7 +58,11 @@ struct AgentRelay: Sendable {
             case .signRequest:
                 reply = handleSignRequest(message, client: client, peer: peer, upstreamFD: upstreamFD)
             case .requestIdentities:
-                reply = forward(message, to: upstreamFD).map(snoopIdentities)
+                let answer = forward(message, to: upstreamFD)
+                // A dropped reply to a plain list request means the upstream is
+                // wedged or gone; heal it so the next connection reconnects.
+                if answer == nil { onUpstreamFailure() }
+                reply = answer.map(snoopIdentities)
             case .extensionRequest where message.extensionType == "session-bind@openssh.com":
                 // pass-cli's agent breaks on this OpenSSH extension, taking the
                 // whole connection down with it. Answer it ourselves so the
@@ -74,6 +80,27 @@ struct AgentRelay: Sendable {
 
             guard let reply, UnixSocket.writeAll(reply.encoded(), to: clientFD) else { return }
         }
+    }
+
+    /// Opens the upstream connection for a new client. If the upstream is down it
+    /// asks the owner to heal it and retries once, so the first connection after
+    /// the daemon has died (a long idle or a sleep/wake) succeeds rather than
+    /// failing. On total failure it writes a clean `failure` to the client, asks
+    /// for a background restart, and returns nil.
+    private func openUpstream(for clientFD: Int32) -> Int32? {
+        if let fd = connectUpstream() { return fd }
+        if waitFor({ await healUpstream() }), let fd = connectUpstream() { return fd }
+        onUpstreamFailure()
+        _ = UnixSocket.writeAll(AgentMessage(type: .failure).encoded(), to: clientFD)
+        return nil
+    }
+
+    /// Connects to the upstream daemon, capping how long a reply read may block so
+    /// a hung daemon can't pin this connection's thread indefinitely.
+    private func connectUpstream() -> Int32? {
+        guard let fd = try? UnixSocket.connect(to: upstreamPath) else { return nil }
+        UnixSocket.setReadTimeout(Self.upstreamReadTimeout, on: fd)
+        return fd
     }
 
     /// Gates a signature on approval. When allowed, the request is forwarded and

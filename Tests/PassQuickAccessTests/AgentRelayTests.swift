@@ -97,7 +97,8 @@ final class AgentRelayTests: XCTestCase {
     private func makeProxy(
         upstream: String,
         allow: Bool,
-        onUpstreamFailure: @escaping @Sendable () -> Void = {}
+        onUpstreamFailure: @escaping @Sendable () -> Void = {},
+        healUpstream: @escaping @Sendable () async -> Bool = { false }
     ) -> AgentRelay {
         AgentRelay(
             upstreamPath: upstream,
@@ -108,7 +109,8 @@ final class AgentRelayTests: XCTestCase {
             ),
             keyNameCache: KeyLabelCache(),
             identifier: ProcessInspector(),
-            onUpstreamFailure: onUpstreamFailure
+            onUpstreamFailure: onUpstreamFailure,
+            healUpstream: healUpstream
         )
     }
 
@@ -238,6 +240,36 @@ final class AgentRelayTests: XCTestCase {
 
         close(pair.mine)
         XCTAssertTrue(healed.didFire, "a failed signature must request a daemon restart")
+    }
+
+    func testDownUpstreamIsHealedAndTheFirstConnectionSucceeds() throws {
+        // The daemon is gone when the client connects (as after a long idle or a
+        // sleep/wake). The relay must heal it in place and retry, so this first
+        // connection succeeds instead of failing and forcing a manual toggle.
+        let upstream = FakeUpstream()
+        let started = HealFlag()
+        let proxy = makeProxy(
+            upstream: upstream.path,
+            allow: true,
+            healUpstream: {
+                // Bring the daemon up exactly when the relay asks, mirroring the
+                // controller's restart-and-wait.
+                try? upstream.start()
+                started.fire()
+                return true
+            }
+        )
+        defer { upstream.stop() }
+
+        let pair = try makeClientPair()
+        DispatchQueue.global().async { proxy.handle(clientFD: pair.proxy) }
+
+        XCTAssertTrue(UnixSocket.writeAll(AgentMessage(type: .requestIdentities).encoded(), to: pair.mine))
+        let identities = try AgentMessage.read(from: pair.mine)
+        XCTAssertEqual(identities?.type, .identitiesAnswer, "the request must succeed once the upstream is healed")
+        XCTAssertTrue(started.didFire, "a down upstream must be healed before failing the connection")
+
+        close(pair.mine)
     }
 
     func testDeniedSignNeverReachesUpstream() throws {

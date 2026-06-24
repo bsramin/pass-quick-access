@@ -92,6 +92,16 @@ enum UnixSocket {
         return fd
     }
 
+    /// Caps how long a blocking read on `fd` waits for data before failing with
+    /// `EAGAIN`. Used on the upstream connection so a daemon that accepts the
+    /// socket but never replies can't wedge a connection's thread forever; the
+    /// stalled read surfaces as a read failure, which the relay treats as an
+    /// upstream failure and heals from.
+    static func setReadTimeout(_ seconds: TimeInterval, on fd: Int32) {
+        var tv = timeval(tv_sec: Int(seconds), tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+    }
+
     /// Writes all of `data` to `fd`, retrying short writes and `EINTR`.
     static func writeAll(_ data: Data, to fd: Int32) -> Bool {
         var ok = true

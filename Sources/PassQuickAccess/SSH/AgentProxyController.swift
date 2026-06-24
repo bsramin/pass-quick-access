@@ -39,6 +39,10 @@ final class AgentProxyController: ObservableObject {
     private var lastAutoRecover: Date?
     private let autoRecoverCooldown: TimeInterval = 5
 
+    /// The in-flight upstream restart, so concurrent connections that all find the
+    /// daemon down share one restart instead of each spawning their own.
+    private var healTask: Task<Bool, Never>?
+
     init(executable: URL, reconnector: PATReconnector? = nil) {
         self.executable = executable
         // After an SSH approval, reuse that Touch ID to restore a dropped session
@@ -73,6 +77,9 @@ final class AgentProxyController: ObservableObject {
             identifier: ProcessInspector(),
             onUpstreamFailure: { [weak self] in
                 Task { @MainActor in self?.autoRecover() }
+            },
+            healUpstream: { [weak self] in
+                await self?.healUpstreamAndWait() ?? false
             }
         )
 
@@ -121,7 +128,7 @@ final class AgentProxyController: ObservableObject {
     /// burst of failed signatures triggers a single restart rather than a storm.
     private func autoRecover() {
         guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled), listener != nil else { return }
-        guard !isAutoRecovering else { return }
+        guard !isAutoRecovering, healTask == nil else { return }
         if let last = lastAutoRecover, Date().timeIntervalSince(last) < autoRecoverCooldown { return }
         isAutoRecovering = true
         lastAutoRecover = Date()
@@ -139,6 +146,33 @@ final class AgentProxyController: ObservableObject {
             vaultFilter: vaultFilter()
         )
         status = await daemon.restart() ? .running : .upstreamUnavailable
+    }
+
+    /// Restarts the upstream daemon and waits for it to come back, coalescing
+    /// concurrent callers onto a single restart. The relay calls this the moment a
+    /// new connection finds the upstream gone, so the first `ssh` after the daemon
+    /// has died (over a long idle or a sleep/wake) heals in place and succeeds,
+    /// instead of failing and leaving the user to toggle the agent by hand.
+    /// Returns whether the daemon is reachable afterwards.
+    func healUpstreamAndWait() async -> Bool {
+        guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled), listener != nil else { return false }
+        if let healTask { return await healTask.value }
+
+        status = .starting
+        let daemon = UpstreamDaemonManager(
+            executable: executable,
+            socketPath: configuredUpstreamPath(),
+            vaultFilter: vaultFilter()
+        )
+        let task = Task { await daemon.restart() }
+        healTask = task
+        let ready = await task.value
+        healTask = nil
+        // A restart supersedes the background-restart cooldown: the daemon is fresh,
+        // so a stray failed signature shouldn't immediately trigger another.
+        lastAutoRecover = Date()
+        status = ready ? .running : .upstreamUnavailable
+        return ready
     }
 
     /// Applies the "set SSH_AUTH_SOCK" toggle immediately.

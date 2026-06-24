@@ -4,15 +4,20 @@ import Foundation
 
 /// Listens on the proxy's Unix socket and hands every accepted connection to a
 /// callback. The listening socket is non-blocking and driven by a
-/// `DispatchSource`; each accepted client fd is processed on a concurrent queue
-/// so one slow signature prompt can't stall other connections.
+/// `DispatchSource`; each accepted client fd is served on its own thread.
+///
+/// A thread per connection, rather than a shared concurrent `DispatchQueue`, is
+/// deliberate. A connection is served by a blocking loop that can sit open for
+/// the whole life of the ssh client (with `ForwardAgent` that's the entire
+/// session) and can block on a Touch ID prompt. GCD's pool has a hard thread
+/// ceiling, so once enough long-lived connections pile up it's exhausted and new
+/// ones get accepted but never served, which surfaces as a "Permission denied
+/// (publickey)" until the agent is toggled off and on. A dedicated thread sidesteps
+/// the ceiling: a new connection is always served at once.
 final class AgentSocketListener: @unchecked Sendable {
     private let path: String
     private let onAccept: @Sendable (Int32) -> Void
     private let acceptQueue = DispatchQueue(label: "it.ramin.PassQuickAccess.ssh.accept")
-    private let workQueue = DispatchQueue(
-        label: "it.ramin.PassQuickAccess.ssh.connections", attributes: .concurrent
-    )
     private var listenFD: Int32 = -1
     private var source: DispatchSourceRead?
 
@@ -30,7 +35,6 @@ final class AgentSocketListener: @unchecked Sendable {
 
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: acceptQueue)
         let onAccept = self.onAccept
-        let workQueue = self.workQueue
         source.setEventHandler {
             while true {
                 let clientFD = accept(fd, nil, nil)
@@ -40,7 +44,9 @@ final class AgentSocketListener: @unchecked Sendable {
                 // reads spuriously fail with EAGAIN between a client's messages.
                 let flags = fcntl(clientFD, F_GETFL, 0)
                 _ = fcntl(clientFD, F_SETFL, flags & ~O_NONBLOCK)
-                workQueue.async { onAccept(clientFD) }
+                let connection = Thread { onAccept(clientFD) }
+                connection.name = "it.ramin.PassQuickAccess.ssh.connection"
+                connection.start()
             }
         }
         source.setCancelHandler {

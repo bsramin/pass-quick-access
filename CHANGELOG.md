@@ -1,6 +1,20 @@
 # Changelog
 
-## v2026-06-19.4
+## v2026-06-24.1
+
+### Fixed
+- Stop the SSH agent from giving `Permission denied (publickey)` after the Mac
+  has been idle or asleep, where the only fix was toggling the agent off and on
+  in Settings. Two things were behind it. The upstream `pass-cli` agent does not
+  survive a long idle or a sleep/wake, and recovery only restarted it in the
+  background after the request had already failed, so the first `ssh` still
+  failed; now, when a connection finds the agent gone, it is restarted and
+  retried in place so that first `ssh` just works. And under heavy use the proxy
+  served every connection from a shared thread pool with a hard ceiling, which
+  long-lived forwarded sessions could exhaust, leaving new connections accepted
+  but never answered; each connection now gets its own thread, so a new `ssh` is
+  always served. A stalled agent reply also no longer pins a connection open
+  indefinitely.
 
 - The first release with a working in-app updater, so new versions arrive as an
 Update pill instead of a manual download.

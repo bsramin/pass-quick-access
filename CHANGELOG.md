@@ -16,6 +16,8 @@
   always served. A stalled agent reply also no longer pins a connection open
   indefinitely.
 
+## v2026-06-19.4
+
 - The first release with a working in-app updater, so new versions arrive as an
 Update pill instead of a manual download.
 

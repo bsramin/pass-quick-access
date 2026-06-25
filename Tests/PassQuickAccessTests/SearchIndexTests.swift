@@ -77,6 +77,25 @@ final class SearchIndexTests: XCTestCase {
         XCTAssertEqual(index.search("", sortOrder: .alphabetical).map(\.title), ["Alpha", "Zebra"])
     }
 
+    func testTitleMatchOutranksABuriedFieldMatch() {
+        let index = SearchIndex(items: [
+            ItemSummary(itemID: "1", shareID: "s", vaultName: "V", title: "Alpha", note: "backup git repo"),
+            ItemSummary(itemID: "2", shareID: "s", vaultName: "V", title: "Zenith Git Host"),
+        ])
+        // Both contain "git", but the title hit outranks the note hit, even though
+        // alphabetically "Alpha" would come first.
+        XCTAssertEqual(index.search("git", sortOrder: .alphabetical).map(\.title), ["Zenith Git Host", "Alpha"])
+    }
+
+    func testPrefixOutranksMidWordInTitle() {
+        let index = SearchIndex(items: [
+            ItemSummary(itemID: "1", shareID: "s", vaultName: "V", title: "Digital Ocean"),
+            ItemSummary(itemID: "2", shareID: "s", vaultName: "V", title: "Gitea"),
+        ])
+        // "Gitea" starts with the query; "Digital" only contains it mid-word.
+        XCTAssertEqual(index.search("git", sortOrder: .alphabetical).map(\.title), ["Gitea", "Digital Ocean"])
+    }
+
     func testSpansMultipleVaults() {
         XCTAssertTrue(SearchIndex(items: items).spansMultipleVaults)
         let single = [ItemSummary(itemID: "1", shareID: "s", vaultName: "Solo", title: "A")]

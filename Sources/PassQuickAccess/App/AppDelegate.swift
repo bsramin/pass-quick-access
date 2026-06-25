@@ -11,12 +11,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: QuickAccessController?
     private var agentController: AgentProxyController?
     private var reconnector: PATReconnector?
-    private var settingsWindow: NSWindow?
+    private var settingsWindowController: SettingsWindowController?
     private let updateController = UpdateController()
     private var sparkleUpdater: SparkleUpdater?
     private var updateObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // The browser-tab suggestion defaults on; every other setting is happy
+        // with its off/zero default, so only this one needs registering.
+        UserDefaults.standard.register(defaults: [SettingKey.matchActiveTab: true])
         NSApp.setActivationPolicy(.accessory)
         installMainMenu()
         installStatusItem()
@@ -195,24 +198,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        let window = settingsWindow ?? makeSettingsWindow()
-        settingsWindow = window
+        let controller = settingsWindowController
+            ?? SettingsWindowController(agentController: agentController, reconnector: reconnector)
+        settingsWindowController = controller
         NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-    }
-
-    private func makeSettingsWindow() -> NSWindow {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Settings"
-        window.contentView = NSHostingView(rootView: SettingsView(agentController: agentController, reconnector: reconnector))
-        window.isReleasedWhenClosed = false
-        window.center()
-        return window
+        controller.showWindow(nil)
     }
 
     private func presentMissingCLI() {

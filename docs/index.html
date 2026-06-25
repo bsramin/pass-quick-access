@@ -175,9 +175,7 @@ section{border-bottom:1px solid var(--line)}
 .keyrow span{color:var(--ink-soft);font-size:15px}
 
 /* ---- screenshots ---- */
-.shots{display:grid;gap:24px;grid-template-columns:1fr;align-items:start}
-@media(min-width:760px){.shots{grid-template-columns:1.22fr .85fr}}
-.shots-col{display:grid;gap:24px}
+.shots{display:flex;flex-direction:column;align-items:center;gap:24px;max-width:520px;margin-inline:auto}
 .shot{margin:0;text-align:center}
 .shot img{display:block;width:100%;height:auto}
 .shot figcaption{margin-top:2px;font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-dim)}
@@ -337,12 +335,17 @@ footer{padding:50px 0 38px}
       <div class="card span2">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
         <h3>Search that matches Proton Pass</h3>
-        <p>The same substring, diacritic-insensitive, multi-word matching as the official client, across titles, usernames, emails, URLs, notes and custom fields. Ordered by most recently modified or alphabetically.</p>
+        <p>The same substring, diacritic-insensitive, multi-word matching as the official client, across titles, usernames, emails, URLs, notes and custom fields. Ranked by relevance, so a hit in the title comes before one buried in a URL or note.</p>
       </div>
       <div class="card">
-        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
-        <h3>Copy what you need</h3>
-        <p>Username, password, or one-time code, each shown only when the item actually has that field.</p>
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7.5 14h9"/></svg></div>
+        <h3>Fill or copy</h3>
+        <p>Type the login straight into the app you came from, in any browser, or copy the username, password or one-time code. Each shown only when the item has it; choose fill, copy, or both.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M6.5 6.5h.01M9.5 6.5h.01"/></svg></div>
+        <h3>Knows the page you're on</h3>
+        <p>Open the panel over a browser and the item for the current tab is picked for you; when several match a site, the list narrows to those. Safari and Chromium work out of the box; Firefox, Zen and web apps are opt-in.</p>
       </div>
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></div>
@@ -450,11 +453,8 @@ footer{padding:50px 0 38px}
       <h2>Native, down to the pixel.</h2>
     </div>
     <div class="shots reveal">
-      <div class="shots-col">
-        <figure class="shot"><img src="screenshots/search.png" alt="Quick-access search panel" loading="lazy"><figcaption>search panel</figcaption></figure>
-        <figure class="shot"><img src="screenshots/detail.png" alt="Item detail view with copy actions" loading="lazy"><figcaption>item detail</figcaption></figure>
-      </div>
-      <figure class="shot"><img src="screenshots/settings.png" alt="Settings window" loading="lazy"><figcaption>settings</figcaption></figure>
+      <figure class="shot"><img src="screenshots/search.png" alt="Quick-access search panel" loading="lazy"><figcaption>search panel</figcaption></figure>
+      <figure class="shot"><img src="screenshots/detail.png" alt="Item detail view with copy actions" loading="lazy"><figcaption>item detail</figcaption></figure>
     </div>
   </div>
 </section>

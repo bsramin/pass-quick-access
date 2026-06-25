@@ -12,6 +12,25 @@ enum SettingKey {
     static let authTimeout = "authTimeout"
     /// How results are ordered (a `SortOrder` raw value).
     static let sortOrder = "sortOrder"
+    /// Whether a fill presses Return afterwards to submit the form. Off by
+    /// default, since auto-submitting can fire before every field is in.
+    static let autotypeSubmitOnFill = "autotypeSubmitOnFill"
+    /// Which actions an item offers: fill, copy, or both (an `ActionMode` raw value).
+    static let actionMode = "actionMode"
+    /// Whether the user has dismissed the settings sponsor link, so it shows once
+    /// and then stays gone.
+    static let sponsorBannerDismissed = "sponsorBannerDismissed"
+    /// Whether opening the panel over a browser pre-selects the item matching the
+    /// active tab's URL. Reads the tab over Apple Events (Automation permission).
+    static let matchActiveTab = "matchActiveTab"
+    /// Whether to read Firefox's active tab too, which requires turning on
+    /// Firefox's accessibility engine. Off by default and opt-in, since that has a
+    /// (small, modern) cost on the browser the user may not want.
+    static let firefoxAccessibility = "firefoxAccessibility"
+    /// Whether to read the URL of non-browser web apps (Safari/Electron-based)
+    /// from the frontmost app's web area. Opt-in: it turns on that app's
+    /// accessibility, and many such apps have no matchable URL.
+    static let webAppMatching = "webAppMatching"
     /// Opt-in: run the SSH agent proxy that gates key signatures behind Touch ID.
     static let sshAgentEnabled = "sshAgentEnabled"
     /// Optional vault name the upstream agent is limited to serving keys from.
@@ -25,6 +44,31 @@ enum SettingKey {
     /// Whether approving an app once stops it prompting again (adds it to the
     /// trusted-apps list); off means every signature asks.
     static let sshRememberApprovedApps = "sshRememberApprovedApps"
+}
+
+/// What actions an item offers, and so what picking a field does. The detail
+/// rows and the keyboard shortcuts both follow it.
+enum ActionMode: String, CaseIterable, Identifiable {
+    /// Fill is the primary on each field, with copy as a secondary (⌘↩ or icon).
+    case fillAndCopy
+    /// Only fill actions, for someone who never wants the clipboard.
+    case fillOnly
+    /// Only copy actions, the classic clipboard-first behaviour.
+    case copyOnly
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .fillAndCopy: return "Fill and copy"
+        case .fillOnly: return "Fill only"
+        case .copyOnly: return "Copy only"
+        }
+    }
+
+    static func current(_ defaults: UserDefaults = .standard) -> ActionMode {
+        defaults.string(forKey: SettingKey.actionMode).flatMap(ActionMode.init) ?? .fillAndCopy
+    }
 }
 
 /// How search results are ordered.

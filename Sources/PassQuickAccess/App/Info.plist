@@ -27,6 +27,11 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock Pass Quick Access with Touch ID.</string>
+	<!-- Reads the active tab's URL from the frontmost browser to pre-select the
+	     matching item. Optional and only used when "Suggest item from the open
+	     browser tab" is on. -->
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Pass Quick Access reads the address of your active browser tab to suggest the matching login.</string>
 	<!-- Sparkle updater. The app checks this appcast at launch and every two
 	     hours; see SECURITY.md. SUPublicEDKey is the public half of the EdDSA
 	     signing key; the private half lives in the maintainer's Keychain and the

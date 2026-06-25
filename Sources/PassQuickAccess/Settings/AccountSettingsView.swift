@@ -13,6 +13,7 @@ struct AccountSettingsView: View {
     @State private var errorMessage: String?
     @State private var signIn: SignInState = .idle
     @State private var signInError: String?
+    @State private var showingCreateHelp = false
 
     private enum SignInState: Equatable {
         case idle, working, signedIn, failed
@@ -36,6 +37,8 @@ struct AccountSettingsView: View {
                         .disabled(!looksLikeToken)
                 }
                 signInStatus
+                Button("How do I create a token?") { showingCreateHelp = true }
+                    .buttonStyle(.link)
             } header: {
                 Text("Stay signed in")
             } footer: {
@@ -46,32 +49,15 @@ struct AccountSettingsView: View {
                 asks for Touch ID before using it.
                 """)
             }
-
-            Section {
-                Text("Create one in Terminal while signed in, scoped read-only to just the vault you need:")
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
-                Text(Self.createCommands)
-                    .font(.system(size: 11, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
-                Button("Copy commands") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(Self.createCommands, forType: .string)
-                }
-                .buttonStyle(.link)
-            } header: {
-                Text("Creating a token")
-            } footer: {
-                Text("Paste the value it prints (it starts with pst_) into the field above. A viewer-scoped token can only read the vaults you grant it.")
-            }
         }
         .formStyle(.grouped)
         .alert("Couldn't save the token", isPresented: showingError) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
+        }
+        .sheet(isPresented: $showingCreateHelp) {
+            CreateTokenHelp(commands: Self.createCommands) { showingCreateHelp = false }
         }
     }
 
@@ -143,12 +129,90 @@ struct AccountSettingsView: View {
         signIn = .idle
     }
 
-    private static let createCommands = """
-    pass-cli personal-access-token create \\
-      --name "Pass Quick Access" --expiration 6m
+    private static let createCommands = [
+        """
+        pass-cli personal-access-token create \\
+          --name "Pass Quick Access" --expiration 6m
+        """,
+        """
+        pass-cli personal-access-token access grant \\
+          --personal-access-token-name "Pass Quick Access" \\
+          --vault-name "SSH" --role viewer
+        """,
+    ]
+}
 
-    pass-cli personal-access-token access grant \\
-      --personal-access-token-name "Pass Quick Access" \\
-      --vault-name "SSH" --role viewer
-    """
+/// The "Creating a token" help, shown as a sheet so each command is its own
+/// monospaced, quoted block with its own copy button.
+private struct CreateTokenHelp: View {
+    let commands: [String]
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Creating a token").font(.headline)
+
+            Text("Run these in Terminal while signed in, scoped read-only to just the vault you need:")
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach(Array(commands.enumerated()), id: \.offset) { _, command in
+                CommandBlock(command: command)
+            }
+
+            Text("Paste the value the first command prints (it starts with pst_) into the field above. A viewer-scoped token can only read the vaults you grant it.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack {
+                Spacer()
+                Button("Done", action: onClose)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 560)
+    }
+}
+
+/// One command shown like a small terminal window: a dark body with a `$` prompt
+/// and monospaced text, a title bar with the traffic-light dots, and a copy button.
+private struct CommandBlock: View {
+    let command: String
+    @State private var copied = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Circle().fill(Color(red: 1.00, green: 0.37, blue: 0.34)).frame(width: 11, height: 11)
+                Circle().fill(Color(red: 1.00, green: 0.74, blue: 0.18)).frame(width: 11, height: 11)
+                Circle().fill(Color(red: 0.20, green: 0.78, blue: 0.35)).frame(width: 11, height: 11)
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(command, forType: .string)
+                    copied = true
+                } label: {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(copied ? .green : Color(white: 0.75))
+                }
+                .buttonStyle(.plain)
+                .help("Copy this command")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color(white: 0.22))
+
+            Text("$ \(command)")
+                .font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled)
+                .foregroundStyle(Color(white: 0.92))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(white: 0.13))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
 }

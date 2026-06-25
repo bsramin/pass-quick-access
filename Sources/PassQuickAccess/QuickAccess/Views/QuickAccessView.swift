@@ -58,6 +58,23 @@ struct QuickAccessView: View {
                 }
                 return .handled
             }
+            if press.modifiers.contains(.command) {
+                // The Fill family mirrors the Copy family but on Return: type into
+                // the app that was frontmost. Shift fills the password alone,
+                // Option the one-time code. Plain ⌘↩ on a field row (combined mode)
+                // copies that field; otherwise it's the quick Fill Login.
+                if press.modifiers.contains(.shift) {
+                    Task { await viewModel.perform(.fillPassword) }
+                } else if press.modifiers.contains(.option) {
+                    Task { await viewModel.perform(.fillTOTP) }
+                } else if viewModel.showsRowCopy, viewModel.isShowingDetail,
+                          let copy = viewModel.actionSelection.copyCounterpart {
+                    Task { await viewModel.perform(copy) }
+                } else {
+                    Task { await viewModel.perform(.fillLogin) }
+                }
+                return .handled
+            }
             if press.modifiers.contains(.option) {
                 Task { await viewModel.perform(.openInBrowser) }
             } else if viewModel.isChoosingURL {
@@ -81,9 +98,9 @@ struct QuickAccessView: View {
             guard press.modifiers.contains(.command) else { return .ignored }
             // Reveals the highlighted field in detail, or the password (else the
             // username) of the selected row from the list.
-            let action: QuickAccessViewModel.ItemAction = viewModel.isShowingDetail
+            guard let action = viewModel.isShowingDetail
                 ? viewModel.actionSelection
-                : viewModel.availableActions.contains(.copyPassword) ? .copyPassword : .copyUsername
+                : viewModel.listRevealAction else { return .handled }
             Task { await viewModel.reveal(action) }
             return .handled
         }
@@ -118,6 +135,14 @@ struct QuickAccessView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 18, weight: .regular))
                 .focused($searchFocused)
+            if viewModel.isIndexing {
+                // A spinner right in the field, so while you're typing you can see
+                // the index is still filling in and a missing item may just not
+                // have loaded yet, even if the footer hint is out of your eyeline.
+                ProgressView()
+                    .controlSize(.small)
+                    .help("Still indexing your vaults")
+            }
             if updateController.available != nil {
                 UpdatePill()
                     .onTapGesture { updateController.showReleaseNotes() }
@@ -202,8 +227,8 @@ struct QuickAccessView: View {
                     .foregroundStyle(.primary)
             } else {
                 hint("→", "Actions")
-                hint("⌘C", "Username")
-                hint("⌘⇧C", "Password")
+                if viewModel.offersFill { hint("⌘↩", "Fill") }
+                if viewModel.offersCopy { hint("⌘C", "Copy") }
             }
             Spacer()
             hint("esc", "Close")
@@ -245,7 +270,7 @@ struct QuickAccessView: View {
                 .padding(8)
             } else {
                 VStack(spacing: 2) {
-                    ForEach(viewModel.availableActions) { action in
+                    ForEach(viewModel.actionRows) { action in
                         actionRow(action)
                     }
                 }
@@ -280,11 +305,27 @@ struct QuickAccessView: View {
 
     private func actionRow(_ action: QuickAccessViewModel.ItemAction) -> some View {
         let isSelected = action == viewModel.actionSelection
-        return HStack {
-            Text(action.title)
+        // In the combined mode a field row fills on click and offers copy as a
+        // trailing icon; otherwise the row just shows its shortcut.
+        let copy = viewModel.showsRowCopy ? action.copyCounterpart : nil
+        return HStack(spacing: 8) {
+            Text(action.rowLabel)
             Spacer()
-            Text(action.shortcut)
+            if let copy {
+                Button {
+                    viewModel.actionSelection = action
+                    Task { await viewModel.perform(copy) }
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.borderless)
                 .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
+                .help("Copy instead of fill (⌘↩)")
+            } else {
+                Text(action.shortcut)
+                    .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
+            }
         }
         .font(.system(size: 13))
         .padding(.horizontal, 10)
@@ -308,6 +349,8 @@ struct QuickAccessView: View {
             Image(systemName: "folder")
             Text("Located in \(item.vaultName)").lineLimit(1)
             Spacer()
+            hint("↩", viewModel.offersFill ? "Fill" : "Copy")
+            if viewModel.showsRowCopy { hint("⌘↩", "Copy") }
             hint("⌘L", "Large type")
             hint("←", "Back")
         }

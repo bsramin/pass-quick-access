@@ -2,15 +2,19 @@
 
 import Foundation
 
-/// In-memory search over the login index, reproducing Proton Pass's own matcher
-/// (packages/pass/lib/search/match-items.ts): normalize, split the query into
-/// space-separated needles, and keep items where every needle is a substring of
-/// some searchable field. It is substring, not fuzzy, matching, with no scoring;
-/// results keep the index order (alphabetical by title).
+/// In-memory search over the login index. Matching reproduces Proton Pass's own
+/// matcher (packages/pass/lib/search/match-items.ts): normalize, split the query
+/// into space-separated needles, and keep items where every needle is a substring
+/// of some searchable field. On top of that it ranks the matches by where they hit
+/// (a title beats a username beats a buried URL or note, and a prefix beats a
+/// mid-word match), so the most relevant items come first.
 struct SearchIndex: Sendable {
     private struct Entry: Sendable {
         let item: ItemSummary
         let searchable: String
+        /// Normalized title and account, kept apart from the rest for ranking.
+        let title: String
+        let account: String
     }
 
     private let entries: [Entry]
@@ -20,17 +24,57 @@ struct SearchIndex: Sendable {
     let spansMultipleVaults: Bool
 
     init(items: [ItemSummary]) {
-        entries = items.map { Entry(item: $0, searchable: Self.searchableText(for: $0)) }
+        entries = items.map { item in
+            Entry(
+                item: item,
+                searchable: Self.searchableText(for: item),
+                title: Self.normalize(item.title),
+                account: Self.normalize([item.username, item.email].compactMap { $0 }.joined(separator: " "))
+            )
+        }
         spansMultipleVaults = Set(items.map(\.vaultName)).count > 1
+    }
+
+    /// Every item whose stored URL matches `host`, most recently modified first,
+    /// scanning the whole index rather than the capped result list so a match
+    /// isn't missed for a login outside the top results.
+    func items(matchingHost host: String) -> [ItemSummary] {
+        entries.map(\.item)
+            .filter { $0.urls.contains { WebHost.from($0).map { WebHost.matches(host, $0) } ?? false } }
+            .sorted { $0.modifyTime > $1.modifyTime }
     }
 
     func search(_ rawQuery: String, sortOrder: SortOrder, limit: Int = 200) -> [ItemSummary] {
         let needles = Self.needles(from: rawQuery)
-        let matched = needles.isEmpty
-            ? entries.map(\.item)
-            : entries.filter { entry in needles.allSatisfy(entry.searchable.contains) }.map(\.item)
+        guard !needles.isEmpty else {
+            return Array(entries.map(\.item).sorted(by: Self.areInOrder(sortOrder)).prefix(limit))
+        }
 
-        return Array(matched.sorted(by: Self.areInOrder(sortOrder)).prefix(limit))
+        let scored = entries
+            .filter { entry in needles.allSatisfy(entry.searchable.contains) }
+            .map { entry in (item: entry.item, score: Self.score(entry, needles: needles)) }
+            .sorted { lhs, rhs in
+                lhs.score != rhs.score ? lhs.score > rhs.score : Self.areInOrder(sortOrder)(lhs.item, rhs.item)
+            }
+        return Array(scored.prefix(limit).map(\.item))
+    }
+
+    /// An item's relevance for a query: the sum over needles of the best field a
+    /// needle hits, so matching every needle in the title outranks matching them
+    /// scattered across URLs or notes.
+    private static func score(_ entry: Entry, needles: [String]) -> Int {
+        needles.reduce(0) { total, needle in total + fieldScore(entry, needle) }
+    }
+
+    private static func fieldScore(_ entry: Entry, _ needle: String) -> Int {
+        if entry.title == needle { return 120 }
+        if entry.title.hasPrefix(needle) { return 100 }
+        if entry.title.contains(" " + needle) { return 80 }
+        if entry.title.contains(needle) { return 60 }
+        if entry.account.hasPrefix(needle) { return 45 }
+        if entry.account.contains(needle) { return 30 }
+        // It passed the filter, so it matched somewhere (a URL, note or custom field).
+        return 10
     }
 
     /// Ordering for results. `lastModified` is most-recent-first, like Proton's

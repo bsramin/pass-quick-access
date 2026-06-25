@@ -12,6 +12,7 @@ import SwiftUI
 final class QuickAccessController {
     private let viewModel: QuickAccessViewModel
     private let largeType = LargeTypeWindowController()
+    private let autoTyper = AutoTyper()
     private let recovery: SessionRecovery
     private let reconnector: PATReconnector
     private let updateController: UpdateController
@@ -44,6 +45,7 @@ final class QuickAccessController {
             self?.recovery.cancel()
             self?.webLogin.cancel()
         }
+        viewModel.onAutotype = { [weak self] request in self?.autotype(request) }
         viewModel.onReveal = { [weak self] request in
             guard let self else { return }
             self.appBeforeLargeType = self.previousApp
@@ -56,6 +58,19 @@ final class QuickAccessController {
             // height is computed from the new state.
             DispatchQueue.main.async { self?.layoutPanel() }
         }
+        // Warm a Gecko browser's accessibility tree when it comes to the front, so
+        // the tab URL is ready to read by the time the panel is summoned.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appActivated(_:)),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil
+        )
+    }
+
+    @objc private func appActivated(_ note: Notification) {
+        guard UserDefaults.standard.bool(forKey: SettingKey.matchActiveTab),
+              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              BrowserContext.isGecko(app.bundleIdentifier) else { return }
+        BrowserContext.activateAccessibility(of: app)
     }
 
     func registerHotkey() {
@@ -120,6 +135,9 @@ final class QuickAccessController {
     func show() {
         // Capture the target before anything (an auth sheet would change it).
         let frontmost = NSWorkspace.shared.frontmostApplication
+        // Read the browser's tab now, while it's still frontmost, to pre-select
+        // the matching item once the list is up.
+        viewModel.contextHost = browserHost(of: frontmost)
 
         guard requiresUnlock else {
             present(frontmost: frontmost)
@@ -156,6 +174,13 @@ final class QuickAccessController {
         Task { await viewModel.loadIfNeeded() }
     }
 
+    /// The host of the frontmost browser's active tab, when the setting is on and
+    /// the frontmost app is a scriptable browser. Nil otherwise.
+    private func browserHost(of app: NSRunningApplication?) -> String? {
+        guard UserDefaults.standard.bool(forKey: SettingKey.matchActiveTab), let app else { return nil }
+        return BrowserContext.activeTabURL(of: app).flatMap(WebHost.from)
+    }
+
     /// Whether the panel must authenticate before opening, given the setting and
     /// how long ago the last successful unlock was.
     private var requiresUnlock: Bool {
@@ -175,6 +200,45 @@ final class QuickAccessController {
         panel?.orderOut(nil)
         if restoringFocus { previousApp?.activate() }
         previousApp = nil
+    }
+
+    /// Types a credential into the app that was frontmost when the panel opened.
+    /// Without Accessibility access nothing can be posted, so it prompts and
+    /// leaves the panel up with a hint rather than silently doing nothing.
+    private func autotype(_ request: AutotypeRequest) {
+        guard AutoTyper.isProcessTrusted else {
+            // Drop the panel first: as a floating window it sits over the system
+            // Accessibility prompt and hides it. Then ask for access and open the
+            // settings pane so the grant is one visible step away.
+            hide()
+            AutoTyper.promptForAccess()
+            AutoTyper.openAccessibilitySettings()
+            return
+        }
+        guard let target = previousApp,
+              target.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            viewModel.toast = "Couldn't find the app to fill"
+            return
+        }
+        hide()
+        Task {
+            // Only type once the intended app is actually frontmost, so a secret
+            // can never land in the wrong window if focus didn't return.
+            guard await frontmost(is: target) else { return }
+            autoTyper.type(request)
+        }
+    }
+
+    /// Waits briefly for `app` to become the frontmost application after the
+    /// panel hands focus back, polling so a slow activation still catches up.
+    private func frontmost(is app: NSRunningApplication) async -> Bool {
+        for _ in 0..<20 {
+            if NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        return NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
     }
 
     private func makePanel() -> QuickAccessPanel {
@@ -213,7 +277,7 @@ final class QuickAccessController {
             let header: CGFloat = 52
             let rowCount = viewModel.isChoosingURL
                 ? (viewModel.urlChoices?.count ?? 0)
-                : viewModel.availableActions.count
+                : viewModel.actionRows.count
             let count = CGFloat(max(rowCount, 1))
             let rows = count * 30 + (count - 1) * 2 + 16
             return searchField + 1 + header + 1 + rows + footer

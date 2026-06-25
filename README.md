@@ -7,7 +7,7 @@
 
 
 A native macOS quick-access window for [Proton Pass](https://proton.me/pass).
-Press a keystroke from any app, search your logins, and copy a username,
+Press a keystroke from any app, search your logins, and fill or copy a username,
 password or one-time code, or open the item's site in your browser. The same
 idea as 1Password's Quick Access, built for Proton Pass, which ships an Electron
 desktop app and no native quick-access of its own.
@@ -37,9 +37,9 @@ and I get a small reward if you subscribe.
 
 ## Screenshots
 
-| Search | Item detail | Settings |
-| --- | --- | --- |
-| ![Search](docs/screenshots/search.png) | ![Item detail](docs/screenshots/detail.png) | ![Settings](docs/screenshots/settings.png) |
+| Search | Item detail |
+| --- | --- |
+| ![Search](docs/screenshots/search.png) | ![Item detail](docs/screenshots/detail.png) |
 
 ## How it works
 
@@ -48,19 +48,19 @@ the official [`pass-cli`](https://github.com/protonpass/pass-cli), the
 Proton-maintained command-line client, and wraps it in a native macOS UI.
 
 ```
- ┌──────────────────────────────────────────┐
- │ Floating panel (AppKit NSPanel + SwiftUI) │
- │   hotkey ▸ search ▸ pick ▸ copy / open    │
- └───────────────┬──────────────────────────┘
-                 │ metadata only (titles, URLs, usernames)
- ┌───────────────▼──────────────────────────┐
- │ PassCLIClient  (actor over pass-cli)      │
- │   vault list · item list · item view      │
- └───────────────┬──────────────────────────┘
-                 │ secrets fetched just-in-time, never cached
- ┌───────────────▼──────────────────────────┐
- │ pass-cli  ▸  Proton Pass servers          │
- └──────────────────────────────────────────┘
+   ┌───────────────────────────────────────────┐
+   │ Floating panel (AppKit NSPanel + SwiftUI) │
+   │   hotkey ▸ search ▸ pick ▸ fill / copy    │
+   └───────────────┬───────────────────────────┘
+                   │ metadata only (titles, URLs, usernames)
+   ┌───────────────▼───────────────────────────┐
+   │ PassCLIClient  (actor over pass-cli)      │
+   │   vault list · item list · item view      │
+   └───────────────┬───────────────────────────┘
+                   │ secrets fetched just-in-time, never cached
+   ┌───────────────▼───────────────────────────┐
+   │ pass-cli  ▸  Proton Pass servers          │
+   └───────────────────────────────────────────┘
 ```
 
 ## Features
@@ -70,16 +70,26 @@ Proton-maintained command-line client, and wraps it in a native macOS UI.
   dismisses when it loses focus.
 - **Search that matches Proton Pass**: the same substring, diacritic-insensitive,
   multi-word matching as the official client, over titles, usernames, emails,
-  URLs, notes and custom fields. Results are ordered by most recently modified
-  or alphabetically.
-- **Item detail view** with copy actions, each shown only when the item has that
-  field:
-  - Copy Username
-  - Copy Password
-  - Copy One-Time Code
+  URLs, notes and custom fields. Matches are ranked by relevance, so a hit in the
+  title comes before one buried in a URL or note; with no query, items fall back
+  to most recently modified or alphabetical order.
+- **Fill or copy**, each action shown only when the item has that field:
+  - Fill Login (types the username, a Tab, then the password), or Fill Username,
+    Fill Password and Fill One-Time Code on their own
+  - Copy Username, Copy Password, Copy One-Time Code
   - Open in Browser, with a chooser when an item has several URLs
+- **Autofill into the app you came from**: rather than copy, the app types the
+  login into the focused field of whatever was frontmost, in any browser or app,
+  by sending real keystrokes. Pick whether choosing an item fills, copies, or
+  both under **Settings → Autofill**. Filling needs macOS Accessibility access.
+- **Knows the page you're on**: open the panel over a browser and the item for
+  the current tab is selected for you; when several match the same site, the list
+  is filtered to those. Safari and Chromium browsers are read over Automation;
+  Firefox, Zen and web apps are opt-in, since reading them turns on their
+  accessibility engine.
 - **Keyboard driven**: arrows to move, Page Up/Down and Home/End to jump, `→`
-  to open an item, `←` to step back, `esc` to close.
+  to open an item, `←` to step back, `esc` to close. ⌘↩ fills the login, the
+  ⌘C family copies.
 - **Resume**: reopen within 30 seconds of an action and you land back on the
   same item, to grab another field.
 - **Optional Touch ID lock** with a configurable timeout, falling back to your

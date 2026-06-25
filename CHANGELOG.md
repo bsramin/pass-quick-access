@@ -1,5 +1,34 @@
 # Changelog
 
+## v2026-06-25.1
+
+### Added
+- Fill logins into the app you came from. Pick an item and the app types the
+  username, a Tab, then the password into whatever field has focus, in any
+  browser or app, by sending real keystrokes. There are separate Fill Username,
+  Fill Password and Fill One-Time Code actions too, and an option to press Return
+  afterwards to submit. Filling uses macOS Accessibility access, which the app
+  asks for the first time you use it.
+- Choose whether picking an item fills, copies, or both, under Settings →
+  Autofill. Copy works exactly as before for anyone who prefers the clipboard.
+- Suggest the item for the page you're on. Open the panel over a browser and the
+  login matching the current tab is selected for you; when several logins match
+  the same site, the list narrows to just those. Safari and Chromium browsers
+  are read over Automation, which macOS asks to allow once per browser. Firefox,
+  Zen and other web apps are opt-in, since reading them turns on their
+  accessibility engine.
+
+### Changed
+- Redesigned Settings into a native preference window: a tab per area (General,
+  Autofill, Security, Icons, Account, SSH Agent, About), with sub-tabs where a
+  tab covers more than one thing, and the window resizing to fit each tab.
+- Show a small spinner in the search field while the vaults are still indexing,
+  so an item that hasn't loaded yet reads as "still indexing" rather than missing.
+- Rank search results by where the match lands, so the most relevant item comes
+  first. A hit in the title beats one in the username, which beats one buried in
+  a URL or note, and a match at the start of a word beats one in the middle. The
+  set of results is unchanged; only their order is more useful.
+
 ## v2026-06-24.1
 
 ### Fixed

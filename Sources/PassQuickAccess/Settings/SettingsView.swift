@@ -38,7 +38,7 @@ enum SettingsPane: String, CaseIterable {
     /// block so nothing scrolls. Sub-tabbed panes stay short by showing one block.
     var height: CGFloat {
         switch self {
-        case .general: return 280
+        case .general: return 380
         case .autofill: return 260
         case .security: return 210
         case .icons: return 190
@@ -91,6 +91,7 @@ struct SubTabBar<Tab: Identifiable & Equatable>: View {
 /// The activation hotkey and how results are ordered.
 struct GeneralSettings: View {
     @AppStorage(SettingKey.sortOrder) private var sortOrder = SortOrder.lastModified.rawValue
+    @AppStorage(SettingKey.prioritizeFrequentlyUsed) private var prioritizeFrequentlyUsed = false
 
     var body: some View {
         Form {
@@ -106,10 +107,11 @@ struct GeneralSettings: View {
                 Picker("Order results by", selection: $sortOrder) {
                     ForEach(SortOrder.allCases) { Text($0.label).tag($0.rawValue) }
                 }
+                Toggle("Show frequently used items first", isOn: $prioritizeFrequentlyUsed)
             } header: {
                 Text("Sorting")
             } footer: {
-                Text("pass-cli doesn't expose last-use time, so \u{201C}Recently modified\u{201D} sorts by edit date. [Ask Proton to add it.](https://protonmail.uservoice.com/forums/953584-proton-pass-authenticator/suggestions/51396523-cli-expose-and-update-last-used-time-for-items)")
+                Text("pass-cli doesn't expose last-use time, so \u{201C}Recently modified\u{201D} sorts by edit date. [Ask Proton to add it.](https://protonmail.uservoice.com/forums/953584-proton-pass-authenticator/suggestions/51396523-cli-expose-and-update-last-used-time-for-items)\n\nShowing frequently used items first keeps a private tally, on this Mac, of how often you use each login and floats your most-used ones to the top. Off by default; nothing about usage is stored unless you turn it on.")
             }
         }
         .formStyle(.grouped)

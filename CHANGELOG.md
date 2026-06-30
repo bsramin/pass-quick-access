@@ -1,5 +1,28 @@
 # Changelog
 
+## v2026-06-30.1
+
+### Added
+- Optionally show the logins you use most at the top of the list. Turn on "Show
+  frequently used items first" under Settings → General and the app keeps a
+  private count, on this Mac, of how often you pick each item and floats your
+  most-used ones up, with your chosen order breaking ties. It's off by default,
+  and nothing about your usage is stored unless you turn it on.
+- A nine-hour option for how long an unlock lasts, under Settings → Security, for
+  anyone who wants Touch ID just once a working day.
+
+### Fixed
+- Stop the Proton Pass session dropping on its own and sending you back to the
+  sign-in prompt, even with an access token saved. pass-cli keeps one session on
+  disk and rotates its token as it's used, so when the panel and the SSH agent
+  both reached for it at once they rotated each other's token out and lost the
+  session. Every pass-cli call the app makes now takes a shared lock, so they no
+  longer overlap. When a session does drop, the panel quietly signs back in from
+  the saved token, reusing the unlock you just did, instead of showing the
+  signed-out screen. And a passing pass-cli error that only mentioned "session"
+  no longer reads as a logout, which was sometimes throwing up the prompt for no
+  reason.
+
 ## v2026-06-25.1
 
 ### Added

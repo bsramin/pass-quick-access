@@ -3,6 +3,7 @@
 import AppKit
 import Combine
 import KeyboardShortcuts
+import LocalAuthentication
 import SwiftUI
 
 /// Owns the floating panel and wires it to the global hotkey. The panel grows
@@ -22,6 +23,9 @@ final class QuickAccessController {
     private var anchorTopLeft: NSPoint?
     private var cancellable: AnyCancellable?
     private var lastUnlock: Date?
+    /// The context from the most recent unlock, reused for a no-prompt reconnect
+    /// when a command finds the session gone while the panel is open.
+    private var lastAuthContext: LAContext?
     /// The app that was frontmost before a reveal, restored when the panel
     /// reappears after the large-type window closes.
     private var appBeforeLargeType: NSRunningApplication?
@@ -45,6 +49,7 @@ final class QuickAccessController {
             self?.recovery.cancel()
             self?.webLogin.cancel()
         }
+        viewModel.onSilentReconnect = { [weak self] in await self?.attemptSilentReconnect() ?? false }
         viewModel.onAutotype = { [weak self] request in self?.autotype(request) }
         viewModel.onReveal = { [weak self] request in
             guard let self else { return }
@@ -118,6 +123,18 @@ final class QuickAccessController {
         }
     }
 
+    /// Reconnects from the stored token with no prompt, reusing the most recent
+    /// unlock (or a fresh context when the panel lock is off), so a session that
+    /// drops mid-use heals before the user ever sees the signed-out prompt. The
+    /// SSH agent is brought back in the background so the index reload isn't held
+    /// up by the daemon restart. Returns whether the session is back.
+    private func attemptSilentReconnect() async -> Bool {
+        guard PATStore.hasToken() else { return false }
+        let restored = await reconnector.restoreSessionIfNeeded(using: lastAuthContext ?? LAContext())
+        if restored { Task { await onSessionRestored?() } }
+        return restored
+    }
+
     /// Shared completion for any successful re-login: reload the index and bring
     /// the SSH agent back in step.
     private func handleSessionRestored() async {
@@ -146,6 +163,7 @@ final class QuickAccessController {
         Task {
             guard let auth = await BiometricAuth.authenticatedContext(reason: "unlock Pass Quick Access") else { return }
             lastUnlock = Date()
+            lastAuthContext = auth.context
             present(frontmost: frontmost)
             // Reuse the unlock's Touch ID to restore a dropped session, so the
             // panel fills in instead of showing the signed-out prompt.

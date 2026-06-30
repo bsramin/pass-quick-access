@@ -139,6 +139,60 @@ final class PassCLIClientTests: XCTestCase {
         XCTAssertEqual(runner.environment?["PROTON_PASS_PERSONAL_ACCESS_TOKEN"], token)
         XCTAssertFalse(runner.arguments.contains(token), "the token must never appear in argv")
     }
+
+    func testLostSessionMessagesAreAuthenticationFailures() {
+        for message in [
+            "Error: you are not logged in",
+            "there is no session, please log in",
+            "your session expired",
+            "request unauthorized",
+        ] {
+            let error = PassCLIError.commandFailed(status: 1, stderr: message)
+            XCTAssertTrue(error.isAuthenticationFailure, "\"\(message)\" should read as signed-out")
+        }
+    }
+
+    func testTransientErrorMentioningSessionIsNotAuthenticationFailure() {
+        // A non-auth error that merely contains the word "session" must not flip
+        // the panel to the signed-out prompt.
+        let error = PassCLIError.commandFailed(status: 1, stderr: "failed to refresh session token: network timeout")
+        XCTAssertFalse(error.isAuthenticationFailure)
+    }
+
+    func testSessionLockSerialisesConcurrentHolders() async {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pqa-session-lock-\(UUID().uuidString)")
+        let counter = ConcurrencyCounter()
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    guard let token = await SessionLock.acquire(at: url) else { return }
+                    await counter.enter()
+                    try? await Task.sleep(for: .milliseconds(10))
+                    await counter.leave()
+                    token.release()
+                }
+            }
+        }
+
+        let peak = await counter.peak
+        XCTAssertEqual(peak, 1, "the session lock must let only one holder run at a time")
+    }
+}
+
+/// Tracks how many tasks hold a resource at once, so a test can prove the lock
+/// keeps them from overlapping.
+private actor ConcurrencyCounter {
+    private var current = 0
+    private(set) var peak = 0
+
+    func enter() {
+        current += 1
+        peak = max(peak, current)
+    }
+
+    func leave() { current -= 1 }
 }
 
 // MARK: - Fixtures

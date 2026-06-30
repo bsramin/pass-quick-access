@@ -58,7 +58,11 @@ struct UpstreamDaemonManager: Sendable {
     }
 
     private func run(_ arguments: [String], timeout: Duration) async throws -> ProcessResult {
-        try await runner.run(executable: executable, arguments: arguments, timeout: timeout)
+        // Take the shared session lock so a daemon start/stop, which reads and
+        // rewrites the session, never races the panel's own pass-cli calls.
+        let lock = await SessionLock.acquire()
+        defer { lock?.release() }
+        return try await runner.run(executable: executable, arguments: arguments, timeout: timeout)
     }
 
     private func isReachable() -> Bool {

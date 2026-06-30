@@ -170,6 +170,12 @@ actor PassCLIClient {
         await acquireExecutionSlot()
         defer { releaseExecutionSlot() }
 
+        // Hold the cross-process session lock for the run, so this never overlaps
+        // a pass-cli the SSH daemon manager or the user spawns and races its
+        // session-token refresh. The in-app gate above only covers this client.
+        let lock = await SessionLock.acquire()
+        defer { lock?.release() }
+
         let result = try await runner.run(executable: executable, arguments: arguments, environment: environment, timeout: timeout)
         guard result.status == 0 else {
             let stderr = String(decoding: result.stderr, as: UTF8.self)

@@ -12,6 +12,10 @@ enum SettingKey {
     static let authTimeout = "authTimeout"
     /// How results are ordered (a `SortOrder` raw value).
     static let sortOrder = "sortOrder"
+    /// Opt-in: remember how often each item is used (on this Mac) and float the
+    /// most-used logins to the top. Off by default, so without it the list orders
+    /// purely by `sortOrder` and nothing about usage is recorded.
+    static let prioritizeFrequentlyUsed = "prioritizeFrequentlyUsed"
     /// Whether a fill presses Return afterwards to submit the form. Off by
     /// default, since auto-submitting can fire before every field is in.
     static let autotypeSubmitOnFill = "autotypeSubmitOnFill"
@@ -98,6 +102,7 @@ enum AuthTimeout: Int, CaseIterable, Identifiable {
     case oneHour = 3600
     case threeHours = 10800
     case sixHours = 21600
+    case nineHours = 32400
 
     var id: Int { rawValue }
 
@@ -109,6 +114,7 @@ enum AuthTimeout: Int, CaseIterable, Identifiable {
         case .oneHour: return "After 1 hour"
         case .threeHours: return "After 3 hours"
         case .sixHours: return "After 6 hours"
+        case .nineHours: return "After 9 hours"
         }
     }
 }

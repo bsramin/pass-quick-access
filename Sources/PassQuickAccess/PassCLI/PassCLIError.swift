@@ -23,10 +23,15 @@ extension PassCLIError {
     var isAuthenticationFailure: Bool {
         guard case let .commandFailed(_, stderr) = self else { return false }
         let message = stderr.lowercased()
+        // Specific phrases only: a bare "session" match swept in transient,
+        // non-auth errors (a refresh blip, a daemon message) and turned them into
+        // a spurious signed-out prompt. A real lost session says one of these.
         return message.contains("not logged in")
             || message.contains("no session")
+            || message.contains("session expired")
+            || message.contains("session has expired")
+            || message.contains("invalid session")
             || message.contains("authenticated client")
-            || message.contains("session")
             || message.contains("unauthorized")
             || message.contains("log in")
     }

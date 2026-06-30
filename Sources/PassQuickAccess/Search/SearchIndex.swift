@@ -18,12 +18,14 @@ struct SearchIndex: Sendable {
     }
 
     private let entries: [Entry]
+    /// How many times each item (by id) has been used, for the most-used order.
+    private let usage: [String: Int]
 
     /// True when items span more than one vault, so the UI should disambiguate
     /// results with a vault badge.
     let spansMultipleVaults: Bool
 
-    init(items: [ItemSummary]) {
+    init(items: [ItemSummary], usage: [String: Int] = [:]) {
         entries = items.map { item in
             Entry(
                 item: item,
@@ -32,8 +34,13 @@ struct SearchIndex: Sendable {
                 account: Self.normalize([item.username, item.email].compactMap { $0 }.joined(separator: " "))
             )
         }
+        self.usage = usage
         spansMultipleVaults = Set(items.map(\.vaultName)).count > 1
     }
+
+    /// Every indexed item, so the list can be rebuilt against fresh usage counts
+    /// without re-reading the vaults.
+    var allItems: [ItemSummary] { entries.map(\.item) }
 
     /// Every item whose stored URL matches `host`, most recently modified first,
     /// scanning the whole index rather than the capped result list so a match
@@ -44,17 +51,18 @@ struct SearchIndex: Sendable {
             .sorted { $0.modifyTime > $1.modifyTime }
     }
 
-    func search(_ rawQuery: String, sortOrder: SortOrder, limit: Int = 200) -> [ItemSummary] {
+    func search(_ rawQuery: String, sortOrder: SortOrder, prioritizeUsage: Bool = false, limit: Int = 200) -> [ItemSummary] {
         let needles = Self.needles(from: rawQuery)
+        let ordered = areInOrder(sortOrder, prioritizeUsage: prioritizeUsage)
         guard !needles.isEmpty else {
-            return Array(entries.map(\.item).sorted(by: Self.areInOrder(sortOrder)).prefix(limit))
+            return Array(entries.map(\.item).sorted(by: ordered).prefix(limit))
         }
 
         let scored = entries
             .filter { entry in needles.allSatisfy(entry.searchable.contains) }
             .map { entry in (item: entry.item, score: Self.score(entry, needles: needles)) }
             .sorted { lhs, rhs in
-                lhs.score != rhs.score ? lhs.score > rhs.score : Self.areInOrder(sortOrder)(lhs.item, rhs.item)
+                lhs.score != rhs.score ? lhs.score > rhs.score : ordered(lhs.item, rhs.item)
             }
         return Array(scored.prefix(limit).map(\.item))
     }
@@ -77,10 +85,18 @@ struct SearchIndex: Sendable {
         return 10
     }
 
-    /// Ordering for results. `lastModified` is most-recent-first, like Proton's
-    /// "recent" sort; ties (and the alphabetical order) use the title.
-    private static func areInOrder(_ order: SortOrder) -> (ItemSummary, ItemSummary) -> Bool {
-        { lhs, rhs in
+    /// Ordering for results. When `prioritizeUsage` is on, the most-used items
+    /// lead, with the chosen order breaking ties (and ordering the long tail of
+    /// never-used items, which all sit at zero). `lastModified` is most-recent-
+    /// first, like Proton's "recent" sort; ties (and the alphabetical order) use
+    /// the title.
+    private func areInOrder(_ order: SortOrder, prioritizeUsage: Bool) -> (ItemSummary, ItemSummary) -> Bool {
+        { [usage] lhs, rhs in
+            if prioritizeUsage {
+                let lhsUses = usage[lhs.id] ?? 0
+                let rhsUses = usage[rhs.id] ?? 0
+                if lhsUses != rhsUses { return lhsUses > rhsUses }
+            }
             if order == .lastModified, lhs.modifyTime != rhs.modifyTime {
                 return lhs.modifyTime > rhs.modifyTime
             }

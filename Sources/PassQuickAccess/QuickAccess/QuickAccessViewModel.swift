@@ -125,6 +125,10 @@ final class QuickAccessViewModel: ObservableObject {
     var onReconnect: (() -> Void)?
     /// Invoked when the user cancels a sign-in that's being waited on.
     var onCancelRecovery: (() -> Void)?
+    /// Attempts a no-prompt reconnect from the stored token when a command finds
+    /// the session gone, returning whether it came back. Lets a transient drop
+    /// heal in place instead of showing the signed-out prompt.
+    var onSilentReconnect: (() async -> Bool)?
 
     /// A value to display big, with the item and field it came from.
     struct RevealRequest {
@@ -134,6 +138,7 @@ final class QuickAccessViewModel: ObservableObject {
     }
 
     private let client: PassCLIClient
+    private let usage: UsageTracker
     private var index = SearchIndex(items: [])
     /// The password for the selected item, fetched ahead of a copy so the copy
     /// is instant. Holds at most one secret, cleared when the panel hides.
@@ -157,9 +162,14 @@ final class QuickAccessViewModel: ObservableObject {
     /// because several items matched it. Keeps the list visible with no query.
     @Published private(set) var contextListActive = false
 
-    init(client: PassCLIClient) {
+    init(client: PassCLIClient, usage: UsageTracker = UsageTracker()) {
         self.client = client
+        self.usage = usage
     }
+
+    /// Whether the most-used opt-in is on, so the list floats frequently used
+    /// items to the top and uses are recorded.
+    private var prioritizeUsage: Bool { usage.isEnabled }
 
     var spansMultipleVaults: Bool { index.spansMultipleVaults }
     var isShowingDetail: Bool { detailItem != nil }
@@ -277,17 +287,50 @@ final class QuickAccessViewModel: ObservableObject {
         await reload()
     }
 
+    /// The result of one streaming index pass over the vaults.
+    private enum IndexOutcome {
+        /// Every vault read.
+        case complete
+        /// Some vaults were shown before a failure; keep what's on screen.
+        case partial
+        /// The session is gone and nothing was read.
+        case signedOut
+        /// A non-auth failure with nothing read.
+        case failed(String)
+    }
+
     func reload() async {
         loadState = .loading
         loadingDetail = nil
         isIndexing = true
         defer { isIndexing = false }
 
+        // One silent reconnect retry: a dropped session restored from the stored
+        // token reloads in place, so a transient drop never reaches the signed-out
+        // prompt. Only the second failure (or no token) surfaces it.
+        for attempt in 0...1 {
+            switch await runIndexPass() {
+            case .complete, .partial:
+                return
+            case .signedOut:
+                if attempt == 0, await onSilentReconnect?() == true { continue }
+                enterFailure(Self.signedOutMessage)
+                return
+            case .failed(let message):
+                enterFailure(message)
+                return
+            }
+        }
+    }
+
+    /// Streams the vaults into the index, showing each as it arrives. Returns how
+    /// it ended so `reload` can decide whether to retry or surface a failure.
+    private func runIndexPass() async -> IndexOutcome {
         var accumulated: [ItemSummary] = []
         do {
             for try await vault in client.indexLoginItems() {
                 accumulated.append(contentsOf: vault.items)
-                index = SearchIndex(items: accumulated)
+                index = SearchIndex(items: accumulated, usage: usage.snapshot)
                 // Show the first vault's items right away; keep the spinner only
                 // while nothing has come back yet.
                 if !accumulated.isEmpty { loadState = .ready }
@@ -299,14 +342,18 @@ final class QuickAccessViewModel: ObservableObject {
             }
             loadState = .ready
             loadingDetail = nil
+            usage.prune(keeping: Set(accumulated.map(\.id)))
             refilterPreservingSelection()
             applyContextSelection()
+            return .complete
         } catch let error as PassCLIError where error.isAuthenticationFailure {
             // A vault that's already on screen is more useful than a blank prompt;
-            // only fall back to the signed-out state when nothing was read.
-            if accumulated.isEmpty { enterFailure(Self.signedOutMessage) } else { loadState = .ready }
+            // only report signed-out when nothing was read.
+            guard accumulated.isEmpty else { loadState = .ready; loadingDetail = nil; return .partial }
+            return .signedOut
         } catch {
-            if accumulated.isEmpty { enterFailure(String(describing: error)) } else { loadState = .ready }
+            guard accumulated.isEmpty else { loadState = .ready; loadingDetail = nil; return .partial }
+            return .failed(String(describing: error))
         }
     }
 
@@ -383,6 +430,7 @@ final class QuickAccessViewModel: ObservableObject {
     func openSelectedURL() {
         guard let urlChoices, urlChoices.indices.contains(urlSelection) else { return }
         WebLink.open(urlChoices[urlSelection])
+        if let item = actionTarget { usage.record(item.id) }
         finish(with: "Opening in browser")
     }
 
@@ -428,11 +476,13 @@ final class QuickAccessViewModel: ObservableObject {
         case .copyUsername:
             guard let account = item.account else { toast = "No username for this item"; return }
             Clipboard.copy(account)
+            usage.record(item.id)
             registerCopy(.copyUsername)
             finish(with: "Username copied")
         case .copyPassword:
             do {
                 Clipboard.copy(secret: try await password(for: item.reference))
+                usage.record(item.id)
                 registerCopy(.copyPassword)
                 finish(with: "Password copied")
             } catch {
@@ -441,6 +491,7 @@ final class QuickAccessViewModel: ObservableObject {
         case .copyTOTP:
             do {
                 Clipboard.copy(secret: try await client.totp(for: item.reference))
+                usage.record(item.id)
                 registerCopy(.copyTOTP)
                 finish(with: "One-time code copied")
             } catch {
@@ -450,6 +501,7 @@ final class QuickAccessViewModel: ObservableObject {
             guard !item.urls.isEmpty else { return }
             if item.urls.count == 1 {
                 WebLink.open(item.urls[0])
+                usage.record(item.id)
                 finish(with: "Opening in browser")
             } else {
                 urlChoices = item.urls
@@ -545,6 +597,7 @@ final class QuickAccessViewModel: ObservableObject {
     private func requestAutotype(_ request: AutotypeRequest) {
         lastActionAt = Date()
         resumeItem = actionTarget
+        if let item = actionTarget { usage.record(item.id) }
         onAutotype?(request)
     }
 
@@ -591,6 +644,12 @@ final class QuickAccessViewModel: ObservableObject {
         urlChoices = nil
         query = ""
         contextHonored = false
+        if prioritizeUsage {
+            // Re-rank against the latest usage so a login used since the last open
+            // leads the list now, without re-reading the vaults.
+            index = SearchIndex(items: index.allItems, usage: usage.snapshot)
+            results = index.search("", sortOrder: SortOrder.current(), prioritizeUsage: true)
+        }
         selection = results.first?.id
         applyContextSelection()
     }
@@ -626,12 +685,19 @@ final class QuickAccessViewModel: ObservableObject {
     }
 
     /// A lost session can surface on any command, so surface it the same way
-    /// wherever it happens.
+    /// wherever it happens: try a silent reconnect first, and only show the
+    /// signed-out prompt if the token can't bring the session back.
     private func report(_ error: Error, fallback: String) {
-        if let cliError = error as? PassCLIError, cliError.isAuthenticationFailure {
-            enterFailure(Self.signedOutMessage)
-        } else {
+        guard let cliError = error as? PassCLIError, cliError.isAuthenticationFailure else {
             toast = fallback
+            return
+        }
+        Task {
+            if await onSilentReconnect?() == true {
+                toast = "Reconnected to Proton Pass, try again"
+            } else {
+                enterFailure(Self.signedOutMessage)
+            }
         }
     }
 
@@ -642,7 +708,7 @@ final class QuickAccessViewModel: ObservableObject {
         urlChoices = nil
         contextListActive = false
         contextHonored = true
-        results = index.search(query, sortOrder: SortOrder.current())
+        results = index.search(query, sortOrder: SortOrder.current(), prioritizeUsage: prioritizeUsage)
         // Always select the top match: keeping a prior selection would leave the
         // highlight on an item that the new ranking pushed down the list.
         selection = results.first?.id
@@ -654,7 +720,7 @@ final class QuickAccessViewModel: ObservableObject {
     /// open detail view in place.
     private func refilterPreservingSelection() {
         let previous = selection
-        results = index.search(query, sortOrder: SortOrder.current())
+        results = index.search(query, sortOrder: SortOrder.current(), prioritizeUsage: prioritizeUsage)
         if let previous, results.contains(where: { $0.id == previous }) {
             selection = previous
         } else {

@@ -47,11 +47,12 @@ final class PATReconnector {
     /// Whether a stored token is available to reconnect with.
     var isAvailable: Bool { hasStoredToken() }
 
-    /// Re-establishes only the session, without the index/agent recovery callback.
-    /// Used mid-signature, where restarting the agent would break the in-flight
-    /// upstream connection; the still-running daemon signs over the restored
-    /// session. Reuses an already-authenticated context. No-op when the session
-    /// is up or no token is stored.
+    /// Re-establishes only the session, without the index/agent recovery callback,
+    /// reusing an already-authenticated context (no prompt). Used mid-signature,
+    /// where restarting the agent would break the in-flight upstream connection
+    /// (the still-running daemon signs over the restored session), and by the
+    /// panel's silent reconnect, where the caller reloads and recovers the agent
+    /// itself. No-op when the session is up or no token is stored.
     @discardableResult
     func restoreSessionIfNeeded(using context: LAContext) async -> Bool {
         guard hasStoredToken() else { return false }

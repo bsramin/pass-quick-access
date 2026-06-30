@@ -96,6 +96,59 @@ final class SearchIndexTests: XCTestCase {
         XCTAssertEqual(index.search("git", sortOrder: .alphabetical).map(\.title), ["Gitea", "Digital Ocean"])
     }
 
+    func testFrequentlyUsedComesFirstWhenPrioritized() {
+        let index = SearchIndex(items: [
+            ItemSummary(itemID: "1", shareID: "s", vaultName: "V", title: "Alpha", modifyTime: "2026-06-01T10:00:00"),
+            ItemSummary(itemID: "2", shareID: "s", vaultName: "V", title: "Beta", modifyTime: "2026-06-02T10:00:00"),
+            ItemSummary(itemID: "3", shareID: "s", vaultName: "V", title: "Gamma", modifyTime: "2026-06-03T10:00:00"),
+        ], usage: ["s/2": 5, "s/1": 1])
+        // Beta is used most, Alpha once, Gamma never, regardless of title or date.
+        XCTAssertEqual(index.search("", sortOrder: .lastModified, prioritizeUsage: true).map(\.title), ["Beta", "Alpha", "Gamma"])
+    }
+
+    func testUsageIsIgnoredWhenNotPrioritized() {
+        let index = SearchIndex(items: [
+            ItemSummary(itemID: "1", shareID: "s", vaultName: "V", title: "Alpha", modifyTime: "2026-06-01T10:00:00"),
+            ItemSummary(itemID: "2", shareID: "s", vaultName: "V", title: "Beta", modifyTime: "2026-06-02T10:00:00"),
+        ], usage: ["s/1": 99])
+        // With the opt-in off, the order is the plain sort, not usage.
+        XCTAssertEqual(index.search("", sortOrder: .lastModified).map(\.title), ["Beta", "Alpha"])
+    }
+
+    func testPrioritizedUsageFallsBackToRecencyForUnusedItems() {
+        let index = SearchIndex(items: [
+            ItemSummary(itemID: "1", shareID: "s", vaultName: "V", title: "Old", modifyTime: "2026-06-01T10:00:00"),
+            ItemSummary(itemID: "2", shareID: "s", vaultName: "V", title: "New", modifyTime: "2026-06-09T10:00:00"),
+        ])
+        // Never-used items all tie at zero, so the most recent leads.
+        XCTAssertEqual(index.search("", sortOrder: .lastModified, prioritizeUsage: true).map(\.title), ["New", "Old"])
+    }
+
+    func testPrioritizedUsageBreaksSearchScoreTies() {
+        let index = SearchIndex(items: [
+            ItemSummary(itemID: "1", shareID: "s", vaultName: "V", title: "Git One"),
+            ItemSummary(itemID: "2", shareID: "s", vaultName: "V", title: "Git Two"),
+        ], usage: ["s/2": 3])
+        // Both match "git" with the same score; the more-used one wins the tie.
+        XCTAssertEqual(index.search("git", sortOrder: .lastModified, prioritizeUsage: true).map(\.title), ["Git Two", "Git One"])
+    }
+
+    @MainActor
+    func testUsageTrackerRecordsOnlyWhenOptedIn() {
+        let defaults = UserDefaults(suiteName: "pqa-usage-\(UUID().uuidString)")!
+        let tracker = UsageTracker(defaults: defaults)
+
+        // Off by default: a use leaves nothing stored.
+        tracker.record("s/1")
+        XCTAssertTrue(tracker.snapshot.isEmpty)
+
+        // Opted in: uses accumulate.
+        defaults.set(true, forKey: SettingKey.prioritizeFrequentlyUsed)
+        tracker.record("s/1")
+        tracker.record("s/1")
+        XCTAssertEqual(tracker.snapshot["s/1"], 2)
+    }
+
     func testSpansMultipleVaults() {
         XCTAssertTrue(SearchIndex(items: items).spansMultipleVaults)
         let single = [ItemSummary(itemID: "1", shareID: "s", vaultName: "Solo", title: "A")]

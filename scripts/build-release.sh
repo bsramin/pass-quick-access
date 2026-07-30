@@ -27,6 +27,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 app="dist/dd/Build/Products/Release/PassQuickAccess.app"
 zip="dist/PassQuickAccess.zip"
+distribution_entitlements="Sources/PassQuickAccess/App/PassQuickAccess-Distribution.entitlements"
 
 xcodegen generate
 
@@ -63,10 +64,88 @@ xcodebuild -scheme PassQuickAccess -configuration Release \
     -derivedDataPath dist/dd -destination 'generic/platform=macOS' build \
     ${build_settings[@]+"${build_settings[@]}"}
 
-# Catches an unsigned or partially signed nested bundle (Sparkle ships an
-# Updater.app and two XPC services) here, rather than at notarization, where the
-# same problem comes back as a far less obvious error.
+# Xcode signs the app and the Sparkle framework's outer bundle with the chosen
+# identity, but leaves the executables nested inside the framework ad-hoc signed
+# and without a secure timestamp. Notarization rejects every one of them, and
+# `codesign --verify --deep` does not complain, because an ad-hoc signature is
+# structurally valid; it is the identity behind it that Apple objects to.
+#
+# So re-sign them by hand. Order matters: signing something breaks the seal of
+# whatever contains it, so this works inside out and re-seals the framework and
+# then the app at the end. Existing entitlements are carried over rather than
+# dropped, since these are Sparkle's binaries and its own signing is the
+# reference for what they need.
+if [[ -n "${PQA_SIGN_IDENTITY:-}" ]]; then
+    sparkle="$app/Contents/Frameworks/Sparkle.framework"
+    version="$(cd "$sparkle/Versions/Current" && pwd -P)"
+
+    for item in \
+        "$version/XPCServices/Downloader.xpc" \
+        "$version/XPCServices/Installer.xpc" \
+        "$version/Updater.app" \
+        "$version/Autoupdate"
+    do
+        if [[ ! -e "$item" ]]; then
+            echo "error: expected Sparkle component is missing: $item" >&2
+            echo "error: the framework's layout changed, so this re-signing needs revisiting." >&2
+            exit 1
+        fi
+        entitlements="$(mktemp -t pqa-entitlements)"
+        codesign -d --entitlements "$entitlements" --xml "$item" 2> /dev/null || true
+        if [[ -s "$entitlements" ]]; then
+            codesign --force --options runtime --timestamp \
+                --sign "$PQA_SIGN_IDENTITY" --entitlements "$entitlements" "$item"
+        else
+            codesign --force --options runtime --timestamp --sign "$PQA_SIGN_IDENTITY" "$item"
+        fi
+        rm -f "$entitlements"
+    done
+
+    codesign --force --options runtime --timestamp --sign "$PQA_SIGN_IDENTITY" "$sparkle"
+    codesign --force --options runtime --timestamp --sign "$PQA_SIGN_IDENTITY" \
+        --entitlements "$distribution_entitlements" "$app"
+fi
+
+# Structural check. It passes on an ad-hoc bundle too, so it is a guard against a
+# broken or missing signature, not against the wrong identity; the loop above
+# covers that, and the assertion below confirms it.
 codesign --verify --deep --strict --verbose=2 "$app"
+
+# Every executable in the bundle must carry the app's own team and a secure
+# timestamp, or notarization fails on it. Checking here turns a slow, opaque
+# rejection from Apple into an immediate local failure naming the binary at
+# fault. The team is read back off the app rather than taken from the
+# environment, so this stays honest even if PQA_TEAM_ID was never set.
+#
+# codesign's output is captured once and matched with bash patterns rather than
+# piped into grep: `grep -q` closes the pipe on its first match, codesign takes
+# a SIGPIPE, and under `pipefail` the whole pipeline then reports failure for a
+# binary that was perfectly fine.
+if [[ -n "${PQA_SIGN_IDENTITY:-}" ]]; then
+    app_info="$(codesign -dvv "$app" 2>&1)"
+    expected_team="${app_info#*TeamIdentifier=}"
+    expected_team="${expected_team%%$'\n'*}"
+    if [[ -z "$expected_team" || "$expected_team" == "not set" ]]; then
+        echo "error: the app carries no team identifier, so it was not signed as expected." >&2
+        exit 1
+    fi
+
+    while IFS= read -r macho; do
+        info="$(codesign -dvv "$macho" 2>&1)"
+        if [[ "$info" != *"TeamIdentifier=${expected_team}"* ]]; then
+            echo "error: not signed with team ${expected_team}: ${macho#"$app/"}" >&2
+            exit 1
+        fi
+        # Present only for a secure timestamp; a local-only signature says
+        # "Signed Time" instead, which notarization rejects.
+        if [[ "$info" != *"Timestamp="* ]]; then
+            echo "error: signed without a secure timestamp: ${macho#"$app/"}" >&2
+            exit 1
+        fi
+    done < <(find "$app" -type f -perm -u+x -exec sh -c 'file -b "$1" | grep -q Mach-O' _ {} \; -print)
+
+    echo "All executables signed by team ${expected_team} with a secure timestamp."
+fi
 
 ditto -c -k --keepParent "$app" "$zip"
 

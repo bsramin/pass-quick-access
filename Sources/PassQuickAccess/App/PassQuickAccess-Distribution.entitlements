@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The entitlements of the signed, notarized build. Selected by
+	     scripts/build-release.sh when a Developer ID identity is configured;
+	     everything else uses PassQuickAccess.entitlements.
+
+	     The only difference is what is missing: this one does not disable
+	     library validation, so the hardened runtime will load nothing but code
+	     signed by the same team. That works here because Xcode re-signs the
+	     embedded Sparkle.framework, its XPC services and Updater.app with the
+	     app's identity, which an ad-hoc build has no team for. -->
+	<!-- Reads the active tab's URL from Safari and Chromium browsers, to
+	     pre-select the matching login. Under the hardened runtime an app may
+	     not send Apple events at all without this. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

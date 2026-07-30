@@ -16,9 +16,16 @@ Nothing is written to disk by the app.
 
 The trust boundary is the `pass-cli` session: anyone able to run code as your
 user can read your vault through the CLI directly, so the app's goal is to never
-be a weaker link than the CLI already is. Signed release builds use the hardened
-runtime without `get-task-allow`. The optional Touch ID lock guards casual
-access to an unlocked Mac, not local code execution.
+be a weaker link than the CLI already is. The optional Touch ID lock guards
+casual access to an unlocked Mac, not local code execution.
+
+Released builds are signed with a Developer ID certificate and notarized by
+Apple. They run under the hardened runtime with `get-task-allow` left out, so
+another process cannot attach to the app, and with library validation on, so the
+app loads no code signed by anyone else. A build made from source without a
+certificate is ad-hoc signed and has to relax library validation, because an
+ad-hoc signature carries no team identifier for the embedded Sparkle framework to
+match; that is the only difference between the two.
 
 See the security model section of the [README](README.md) for more detail.
 
@@ -37,10 +44,11 @@ Nothing installs on its own. When a newer version exists the app shows a small
 "Update" pill and waits; it downloads and replaces the app only after you pick
 "Update Now". Every update is verified against an ed25519 (EdDSA) public key
 pinned inside the app before it is allowed to install, so a tampered or
-intercepted download is rejected even though the build itself is not notarized.
-The private half of the signing key lives only in the maintainer's Keychain and a
-GitHub Actions secret, and the release workflow that uses it runs only when a
-maintainer publishes a release, never from a pull request.
+intercepted download is rejected. That check is Sparkle's own and is independent
+of Apple's notarization, which the download also carries: a forged update has to
+defeat both. The private half of the signing key lives only in the maintainer's
+Keychain and a GitHub Actions secret, and the release workflow that uses it runs
+only when a maintainer publishes a release, never from a pull request.
 
 ## Scope
 

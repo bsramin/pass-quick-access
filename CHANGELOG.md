@@ -8,6 +8,12 @@
   was never entitled to do, so Safari and Chromium tabs were quietly never
   matched no matter how the setting was left.
 
+### Changed
+- The app now opens straight from the download, with no right-click or
+  Terminal command to get past macOS. Releases are signed and notarized, and
+  they keep the hardened runtime fully intact: the shipped build no longer has
+  to make an exception for loading the updater.
+
 ## v2026-06-30.1
 
 ### Added

@@ -5,13 +5,18 @@
 	<!-- Reads the active tab's URL from Safari and Chromium browsers, to
 	     pre-select the matching login. Under the hardened runtime an app may
 	     not send Apple events at all without this, so the Release build needs
-	     it for the feature to work (the consent prompt is still TCC's). -->
+	     it for the feature to work (the consent prompt is still TCC's).
+	     Kept in step with PassQuickAccess-Distribution.entitlements. -->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
-	<!-- The app is ad-hoc signed (no Apple team), but Sparkle.framework ships
-	     signed by the Sparkle project. Under the hardened runtime, library
-	     validation refuses to load a framework with a different team, which
-	     crashes the app at launch. This lets it load the embedded Sparkle. -->
+	<!-- Development and ad-hoc builds only; the shipped app is signed against
+	     PassQuickAccess-Distribution.entitlements, which leaves library
+	     validation on.
+
+	     Xcode re-signs the embedded Sparkle.framework with the app's own
+	     identity, so under a Developer ID the two share a team and library
+	     validation is satisfied. An ad-hoc signature carries no team at all,
+	     so nothing can match it and the app crashes at launch loading Sparkle. -->
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 </dict>

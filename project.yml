@@ -43,7 +43,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: it.ramin.PassQuickAccess
         INFOPLIST_FILE: Sources/PassQuickAccess/App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Sources/PassQuickAccess/App/PassQuickAccess.entitlements
+        # The suffix picks the entitlements variant: empty by default, and set to
+        # "-Distribution" by scripts/build-release.sh for a Developer ID build.
+        # It is done with a variable rather than by overriding the whole path on
+        # the xcodebuild command line, because a command-line setting reaches
+        # every target including the SPM packages, which would then look for the
+        # file inside their own checkout and fail the build.
+        CODE_SIGN_ENTITLEMENTS: Sources/PassQuickAccess/App/PassQuickAccess$(PQA_ENTITLEMENTS_SUFFIX).entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The app launches a subprocess (pass-cli), which the App Sandbox
         # forbids, so it is unsandboxed.

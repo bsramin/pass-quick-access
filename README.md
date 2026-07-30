@@ -14,22 +14,17 @@ desktop app and no native quick-access of its own.
 
 > Not affiliated with or endorsed by Proton AG.
 
-## 💛 Looking for a sponsor
+## 💛 Support the project
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/bsramin)
 
-This is a free, open-source side project, and it will stay that way. I'm looking
-for a **sponsor to cover the Apple Developer Program membership** (99 USD/year).
+This is a free, open-source side project, and it will stay that way.
 
-With it, I can ship the app **notarized and signed**, so it installs without
-Gatekeeper warnings, and add **automatic updates** so everyone stays on the
-latest version effortlessly. The app would remain **completely free and fully
-open source** for everyone, forever. The sponsorship pays only for the Apple
-membership that makes safe, frictionless distribution possible.
-
-If you or your company would like to help, you can sponsor through
-**[GitHub Sponsors](https://github.com/sponsors/bsramin)**. Your support would be
-credited here with thanks.
+If the app is useful to you and you'd like to help with the running costs, the
+Apple Developer Program membership among them, you can sponsor through
+**[GitHub Sponsors](https://github.com/sponsors/bsramin)**. It's entirely
+optional and changes nothing about the app, which is and remains completely free
+and fully open source.
 
 Prefer not to sponsor? You can also sign up for Proton with my
 **[referral link](https://pr.tn/ref/H6KQSW71)**. You get 2 weeks of a paid plan,
@@ -177,12 +172,21 @@ The workflow is the same one you already know:
 - An optional Touch ID lock guards casual access to an unlocked Mac. It is not a
   defense against local code execution.
 
+## Install
+
+Download `PassQuickAccess.zip` from the
+[latest release](https://github.com/bsramin/pass-quick-access/releases/latest),
+unzip it, and move the app to `/Applications`. From then on it tells you when a
+new version is out and installs it only when you pick "Update Now".
+
+You'll also need `pass-cli` installed and logged in (see Requirements).
+
 ## Requirements
 
 - macOS 14 or later
 - [`pass-cli`](https://github.com/protonpass/pass-cli) installed and logged in
   (`pass-cli login`). The CLI requires a paid Proton Pass plan.
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate the project
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen), to build from source
 
 ## Build and run
 
@@ -199,9 +203,10 @@ xcodebuild -scheme PassQuickAccess -destination 'platform=macOS' test
 ```
 
 `PassQuickAccess.xcodeproj` is generated from `project.yml` and is not checked
-in. By default the project builds ad-hoc signed; to sign with your own Apple
-Developer identity, copy `Config/Local.xcconfig.example` to
-`Config/Local.xcconfig` and fill in your team.
+in. By default the project builds ad-hoc signed, which is enough to run it
+locally; to sign with your own Apple Developer identity, copy
+`Config/Local.xcconfig.example` to `Config/Local.xcconfig` and fill in your team.
+Producing a release artifact is [documented separately](RELEASING.md).
 
 ## Limitations
 
@@ -210,10 +215,6 @@ Developer identity, copy `Config/Local.xcconfig.example` to
 - Ordering uses the item's modification time. The official app also factors in
   last-use time, which `pass-cli` does not expose. If you'd like it to, vote for
   [this Proton feature request](https://protonmail.uservoice.com/forums/953584-proton-pass-authenticator/suggestions/51396523-cli-expose-and-update-last-used-time-for-items).
-- Distribution is currently build-from-source. A notarized release needs an
-  Apple Developer ID certificate (a paid Apple Developer Program membership);
-  [sponsoring the project](https://github.com/sponsors/bsramin) would help cover
-  it, so builds could open without a Gatekeeper prompt.
 
 ## Contributing
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Suggesting the login for your open browser tab now works in the released app.
+  Reading the active tab means sending an Apple event, which the release build
+  was never entitled to do, so Safari and Chromium tabs were quietly never
+  matched no matter how the setting was left.
+
 ## v2026-06-30.1
 
 ### Added

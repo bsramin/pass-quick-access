@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## v2026-07-31.1
 
 ### Fixed
 - Suggesting the login for your open browser tab now works in the released app.

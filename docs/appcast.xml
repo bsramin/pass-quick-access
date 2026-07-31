@@ -3,6 +3,26 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-07-31.1</title>
+      <pubDate>Fri, 31 Jul 2026 07:45:31 +0000</pubDate>
+      <sparkle:version>20260731.1</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>### Fixed
+- Suggesting the login for your open browser tab now works in the released app.
+  Reading the active tab means sending an Apple event, which the release build
+  was never entitled to do, so Safari and Chromium tabs were quietly never
+  matched no matter how the setting was left.
+
+### Changed
+- The app now opens straight from the download, with no right-click or
+  Terminal command to get past macOS. Releases are signed and notarized, and
+  they keep the hardened runtime fully intact: the shipped build no longer has
+  to make an exception for loading the updater.
+</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-07-31.1/PassQuickAccess.zip" sparkle:edSignature="XxWXcC2WTllrB1hhV3n5rIMu++t6xKL8zhPyvtvbtsxGmg2xp3pl3nO1mON3B9OqZTXnAif6h4bBIJi8+ocBCg==" length="4444358" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-06-30.1</title>
       <pubDate>Wed, 01 Jul 2026 12:37:45 +0000</pubDate>
       <sparkle:version>20260630.1</sparkle:version>

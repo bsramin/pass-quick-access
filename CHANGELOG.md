@@ -1,5 +1,12 @@
 # Changelog
 
+## v2026-08-02.2
+
+### Fixed
+- "Refresh Index" no longer reads your vaults while the panel lock is on and you
+  haven't unlocked yet. It takes you through the same Touch ID the panel does, so
+  nothing is read before you have authenticated, exactly as at launch.
+
 ## v2026-08-02.1
 
 ### Added

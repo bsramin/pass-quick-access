@@ -241,6 +241,13 @@ final class QuickAccessController {
     }
 
     func refreshIndex() {
+        // Nothing is read before the user has authenticated, the same rule the
+        // launch preload follows, so a first read behind the lock goes through
+        // the panel and its Touch ID rather than happening from the menu.
+        if viewModel.loadState != .ready, requiresUnlock {
+            show()
+            return
+        }
         Task { await viewModel.refreshNow() }
     }
 

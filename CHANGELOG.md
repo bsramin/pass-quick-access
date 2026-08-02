@@ -1,5 +1,23 @@
 # Changelog
 
+## v2026-08-02.1
+
+### Added
+- A "Refresh Index" item in the menu-bar menu, for when you have just added a
+  login somewhere else and want it in the panel right now.
+
+### Changed
+- The app keeps its Proton Pass session warm while it sits in the menu bar. It
+  checks in every fifteen minutes, and again when the Mac wakes, and quietly
+  signs back in from your saved access token when the session has lapsed, so the
+  first press of the hotkey after a long idle opens on your logins instead of the
+  sign-in prompt. The check is a single cheap command: it reads nothing from your
+  vaults and never holds up an SSH signature.
+- Logins added or changed on your other devices now turn up on their own. The
+  index is re-read once it is more than five minutes old, after the panel closes
+  and after the Mac wakes, so nothing runs while you are using the panel and the
+  list is current the next time you open it.
+
 ## v2026-07-31.1
 
 ### Fixed

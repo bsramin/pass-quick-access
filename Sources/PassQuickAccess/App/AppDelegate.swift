@@ -97,6 +97,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open.setShortcut(for: .toggleQuickAccess)
         menu.addItem(open)
 
+        let refresh = NSMenuItem(title: "Refresh Index", action: #selector(refreshIndex), keyEquivalent: "")
+        refresh.target = self
+        refresh.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+        menu.addItem(refresh)
+
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         settings.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
@@ -195,6 +200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openQuickAccess() {
         controller?.show()
+    }
+
+    @objc private func refreshIndex() {
+        controller?.refreshIndex()
     }
 
     @objc private func openSettings() {

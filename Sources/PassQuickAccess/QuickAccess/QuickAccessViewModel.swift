@@ -158,13 +158,17 @@ final class QuickAccessViewModel: ObservableObject {
     /// Set once the context host has resolved (to a detail or a list) for this
     /// open, so a later vault streaming in doesn't move things under the user.
     private var contextHonored = false
+    /// When a pass last read every vault, and how long that read stays good for.
+    private var lastIndexedAt: Date?
+    private let indexFreshness: TimeInterval
     /// True while the panel is showing the list filtered to a browser tab's domain
     /// because several items matched it. Keeps the list visible with no query.
     @Published private(set) var contextListActive = false
 
-    init(client: PassCLIClient, usage: UsageTracker = UsageTracker()) {
+    init(client: PassCLIClient, usage: UsageTracker = UsageTracker(), indexFreshness: TimeInterval = 300) {
         self.client = client
         self.usage = usage
+        self.indexFreshness = indexFreshness
     }
 
     /// Whether the most-used opt-in is on, so the list floats frequently used
@@ -283,7 +287,11 @@ final class QuickAccessViewModel: ObservableObject {
     private var actionTarget: ItemSummary? { detailItem ?? selectedItem }
 
     func loadIfNeeded() async {
-        guard loadState != .ready, loadState != .loading else { return }
+        guard loadState != .loading else { return }
+        if loadState == .ready {
+            await refreshIfStale()
+            return
+        }
         await reload()
     }
 
@@ -323,6 +331,64 @@ final class QuickAccessViewModel: ObservableObject {
         }
     }
 
+    /// Re-reads the vaults once the index has aged out, so a login added on
+    /// another device turns up without relaunching the app.
+    func refreshIfStale() async {
+        guard loadState == .ready, !isIndexing, isIndexStale else { return }
+        await runRefreshPass()
+    }
+
+    /// Re-reads the vaults whatever the index's age, behind the menu's refresh.
+    func refreshNow() async {
+        guard !isIndexing else { return }
+        guard loadState == .ready else {
+            await reload()
+            return
+        }
+        await runRefreshPass()
+    }
+
+    private var isIndexStale: Bool {
+        guard let lastIndexedAt else { return true }
+        return Date().timeIntervalSince(lastIndexedAt) > indexFreshness
+    }
+
+    /// Reads every vault and swaps the index in once, where `runIndexPass` shows
+    /// each vault as it lands: a refresh has a full list on screen already, and
+    /// letting it shrink to one vault and grow back would move the rows under the
+    /// user for nothing. A failure leaves the index it has, which is worth more
+    /// than an error over it.
+    private func runRefreshPass() async {
+        isIndexing = true
+        defer { isIndexing = false }
+
+        var accumulated: [ItemSummary] = []
+        do {
+            for try await vault in client.indexLoginItems() {
+                accumulated.append(contentsOf: vault.items)
+            }
+        } catch let error as PassCLIError where error.isAuthenticationFailure {
+            // Bring the session back, but leave the refresh to the next one
+            // rather than stacking a second pass on a panel that may be in use.
+            _ = await onSilentReconnect?()
+            return
+        } catch {
+            return
+        }
+
+        lastIndexedAt = Date()
+        index = SearchIndex(items: accumulated, usage: usage.snapshot)
+        usage.prune(keeping: Set(accumulated.map(\.id)))
+        guard contextListActive, let contextHost else {
+            refilterPreservingSelection()
+            return
+        }
+        // The list is pinned to a browser tab's domain; refiltering on the empty
+        // query would drop it back to everything under the user.
+        results = index.items(matchingHost: contextHost)
+        if !results.contains(where: { $0.id == selection }) { selection = results.first?.id }
+    }
+
     /// Streams the vaults into the index, showing each as it arrives. Returns how
     /// it ended so `reload` can decide whether to retry or surface a failure.
     private func runIndexPass() async -> IndexOutcome {
@@ -342,6 +408,7 @@ final class QuickAccessViewModel: ObservableObject {
             }
             loadState = .ready
             loadingDetail = nil
+            lastIndexedAt = Date()
             usage.prune(keeping: Set(accumulated.map(\.id)))
             refilterPreservingSelection()
             applyContextSelection()

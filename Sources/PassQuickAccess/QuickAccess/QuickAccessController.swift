@@ -15,6 +15,7 @@ final class QuickAccessController {
     private let largeType = LargeTypeWindowController()
     private let autoTyper = AutoTyper()
     private let recovery: SessionRecovery
+    private let keepalive: SessionKeepalive
     private let reconnector: PATReconnector
     private let updateController: UpdateController
     private let webLogin: WebLogin
@@ -38,6 +39,7 @@ final class QuickAccessController {
 
     init(client: PassCLIClient, executable: URL, reconnector: PATReconnector, updateController: UpdateController) {
         self.recovery = SessionRecovery(client: client)
+        self.keepalive = SessionKeepalive(client: client)
         self.reconnector = reconnector
         self.updateController = updateController
         self.webLogin = WebLogin(executable: executable)
@@ -69,6 +71,21 @@ final class QuickAccessController {
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(systemDidWake),
+            name: NSWorkspace.didWakeNotification, object: nil
+        )
+        keepalive.onSessionLost = { [weak self] in _ = await self?.attemptSilentReconnect() }
+        keepalive.start()
+    }
+
+    /// Sleep is where a session lapses and where the index falls behind, so both
+    /// are caught up on wake rather than at the keepalive's next tick.
+    @objc private func systemDidWake() {
+        Task {
+            await keepalive.ping()
+            await viewModel.refreshIfStale()
+        }
     }
 
     @objc private func appActivated(_ note: Notification) {
@@ -218,6 +235,13 @@ final class QuickAccessController {
         panel?.orderOut(nil)
         if restoringFocus { previousApp?.activate() }
         previousApp = nil
+        // With the panel gone the next open finds a fresh index, and the re-read
+        // never competes with a copy the user is waiting on.
+        Task { await viewModel.refreshIfStale() }
+    }
+
+    func refreshIndex() {
+        Task { await viewModel.refreshNow() }
     }
 
     /// Types a credential into the app that was frontmost when the panel opened.

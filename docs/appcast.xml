@@ -3,6 +3,32 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-08-02.1</title>
+      <pubDate>Sun, 02 Aug 2026 21:23:04 +0000</pubDate>
+      <sparkle:version>20260802.1</sparkle:version>
+      <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>
+### Added
+- A "Refresh Index" item in the menu-bar menu, for when you have just added a
+  login somewhere else and want it in the panel right now.
+
+### Changed
+- The app keeps its Proton Pass session warm while it sits in the menu bar. It
+  checks in every fifteen minutes, and again when the Mac wakes, and quietly
+  signs back in from your saved access token when the session has lapsed, so the
+  first press of the hotkey after a long idle opens on your logins instead of the
+  sign-in prompt. The check is a single cheap command: it reads nothing from your
+  vaults and never holds up an SSH signature.
+- Logins added or changed on your other devices now turn up on their own. The
+  index is re-read once it is more than five minutes old, after the panel closes
+  and after the Mac wakes, so nothing runs while you are using the panel and the
+  list is current the next time you open it.
+
+</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-08-02.1/PassQuickAccess.zip" sparkle:edSignature="CEgGBJ3RO7Mk1WtJ8rktwo1jCvgE+++Jg5fRuOXlSRITkOV78IP0mlSJE8cq9RTEasOn6+IHVLW1S+FUWQRJCg==" length="4466662" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-07-31.1</title>
       <pubDate>Fri, 31 Jul 2026 07:45:31 +0000</pubDate>
       <sparkle:version>20260731.1</sparkle:version>

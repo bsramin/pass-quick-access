@@ -4,16 +4,20 @@ import AppKit
 import LocalAuthentication
 import SwiftUI
 
-/// The SSH approval card. It carries the context (app, key, fingerprint) and the
-/// Touch ID sensor itself, embedded in-window via `BiometricSensorView`, so the
-/// whole prompt is one native surface instead of a card plus a system dialog.
+/// The SSH approval card. It carries the context (app, key, fingerprint) and,
+/// where the hardware allows, the Touch ID sensor itself, embedded in-window via
+/// `BiometricSensorView`, so the whole prompt is one native surface instead of a
+/// card plus a system dialog. Without a `context` it shows an approve button
+/// that opens the system password prompt, so a Mac with no Touch ID still gets
+/// to see what it is approving.
 struct SignInfoView: View {
     let appName: String
     let keyName: String
     let fingerprintShort: String
     let unverified: Bool
-    let context: LAContext
+    let context: LAContext?
     let onAppear: () -> Void
+    let onApprove: () -> Void
     let onDeny: () -> Void
 
     var body: some View {
@@ -25,7 +29,9 @@ struct SignInfoView: View {
             VStack(spacing: 2) {
                 Text("SSH key request")
                     .font(.headline)
-                Text("Authorize the signature with Touch ID")
+                Text(context == nil
+                     ? "Authorize the signature with your password"
+                     : "Authorize the signature with Touch ID")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -49,11 +55,16 @@ struct SignInfoView: View {
                 Button("Deny", role: .cancel, action: onDeny)
                     .keyboardShortcut(.cancelAction)
                 Spacer(minLength: 0)
-                Text("Touch ID to approve")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.secondary)
-                BiometricSensorView(context: context)
-                    .frame(width: 40, height: 40)
+                if let context {
+                    Text("Touch ID to approve")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    BiometricSensorView(context: context)
+                        .frame(width: 40, height: 40)
+                } else {
+                    Button("Approve", action: onApprove)
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .multilineTextAlignment(.center)

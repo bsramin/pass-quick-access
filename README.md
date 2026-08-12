@@ -102,17 +102,21 @@ Proton-maintained command-line client, and wraps it in a native macOS UI.
 ## SSH agent
 
 An optional SSH agent serves your Proton Pass SSH keys to `git` and `ssh`, the
-way 1Password's does, and asks for Touch ID before every signature, naming the
-app that requested it. It is off by default; turn it on under **Settings → SSH**.
+way 1Password's does, and asks for Touch ID before a signature, naming the app
+that requested it. It is off by default; turn it on under **Settings → SSH**.
 
 ![SSH key signature request with Touch ID](docs/screenshots/ssh-agent.png)
 
 It does not hold keys or sign anything itself. `pass-cli` already ships an SSH
 agent that stores the keys and does the signing; this app runs a thin **proxy**
 in front of it that adds the native confirmation. Private keys never enter the
-app, consistent with the security model below. Repeated signatures within a few
-seconds aren't re-prompted, you can mark an app trusted so it stops asking, and
-non-interactive `BatchMode` probes are denied without a prompt.
+app, consistent with the security model below. One approval covers further
+signatures from the same program on the same key for five minutes by default
+(*Settings → SSH → Trusted Apps*, anything from every signature to eight hours),
+you can mark an app trusted for a key so it stops asking, and non-interactive
+`BatchMode` probes are denied without a prompt. The window matters more than it
+sounds: background tools such as an editor's automatic fetch sign every couple of
+minutes on their own.
 
 ### Setting it up
 
@@ -135,7 +139,7 @@ non-interactive `BatchMode` probes are denied without a prompt.
    login session via `launchctl`, so they pick it up too. It applies to programs
    launched afterwards, so quit and reopen a terminal (or app) for it to take
    effect.
-4. **Use `git` and `ssh` normally.** Each signature pops a Touch ID prompt naming
+4. **Use `git` and `ssh` normally.** A signature pops a Touch ID prompt naming
    the app and key. Check the keys are served with:
    ```sh
    SSH_AUTH_SOCK=~/.ssh/pass-quick-access-agent.sock ssh-add -l

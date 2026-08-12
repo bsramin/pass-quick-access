@@ -33,11 +33,17 @@ final class AgentProxyController: ObservableObject {
     private let infoCoordinator = SignInfoCoordinator()
     private var listener: AgentSocketListener?
 
-    /// Debounce for `autoRecover`, so a flurry of failed signatures restarts the
-    /// daemon once rather than repeatedly.
+    /// Debounce for the daemon restarts, so a flurry of failed signatures restarts
+    /// it once rather than repeatedly. A restart is two `pass-cli` runs and two
+    /// reads of the local key from the Keychain, so a daemon that keeps failing
+    /// (a lapsed Proton session, typically) must not be retried on every ssh
+    /// connection: the wait doubles up to `maxRestartCooldown` and only a restart
+    /// that works puts it back to the floor.
     private var isAutoRecovering = false
-    private var lastAutoRecover: Date?
-    private let autoRecoverCooldown: TimeInterval = 5
+    private var lastRestart: Date?
+    private var lastRestartWorked = true
+    private var restartCooldown: TimeInterval = 5
+    private static let maxRestartCooldown: TimeInterval = 300
 
     /// The in-flight upstream restart, so concurrent connections that all find the
     /// daemon down share one restart instead of each spawning their own.
@@ -128,24 +134,39 @@ final class AgentProxyController: ObservableObject {
     /// burst of failed signatures triggers a single restart rather than a storm.
     private func autoRecover() {
         guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled), listener != nil else { return }
-        guard !isAutoRecovering, healTask == nil else { return }
-        if let last = lastAutoRecover, Date().timeIntervalSince(last) < autoRecoverCooldown { return }
+        guard !isAutoRecovering, healTask == nil, !isCoolingDown else { return }
         isAutoRecovering = true
-        lastAutoRecover = Date()
         Task {
             await restartDaemon()
             isAutoRecovering = false
         }
     }
 
-    private func restartDaemon() async {
+    /// Whether the last restart failed recently enough that another one would
+    /// just be noise. A restart that worked never holds anything back.
+    private var isCoolingDown: Bool {
+        guard let lastRestart, !lastRestartWorked else { return false }
+        return Date().timeIntervalSince(lastRestart) < restartCooldown
+    }
+
+    @discardableResult
+    private func restartDaemon() async -> Bool {
         status = .starting
         let daemon = UpstreamDaemonManager(
             executable: executable,
             socketPath: configuredUpstreamPath(),
             vaultFilter: vaultFilter()
         )
-        status = await daemon.restart() ? .running : .upstreamUnavailable
+        let ready = await daemon.restart()
+        noteRestart(worked: ready)
+        status = ready ? .running : .upstreamUnavailable
+        return ready
+    }
+
+    private func noteRestart(worked: Bool) {
+        lastRestart = Date()
+        lastRestartWorked = worked
+        restartCooldown = worked ? 5 : min(Self.maxRestartCooldown, restartCooldown * 2)
     }
 
     /// Restarts the upstream daemon and waits for it to come back, coalescing
@@ -157,6 +178,9 @@ final class AgentProxyController: ObservableObject {
     func healUpstreamAndWait() async -> Bool {
         guard UserDefaults.standard.bool(forKey: SettingKey.sshAgentEnabled), listener != nil else { return false }
         if let healTask { return await healTask.value }
+        // Fail this connection fast rather than spend another restart on a daemon
+        // that just refused to come back.
+        if isCoolingDown { return false }
 
         status = .starting
         let daemon = UpstreamDaemonManager(
@@ -168,9 +192,7 @@ final class AgentProxyController: ObservableObject {
         healTask = task
         let ready = await task.value
         healTask = nil
-        // A restart supersedes the background-restart cooldown: the daemon is fresh,
-        // so a stray failed signature shouldn't immediately trigger another.
-        lastAutoRecover = Date()
+        noteRestart(worked: ready)
         status = ready ? .running : .upstreamUnavailable
         return ready
     }

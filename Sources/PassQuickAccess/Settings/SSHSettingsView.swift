@@ -13,6 +13,7 @@ struct SSHSettingsView: View {
     @AppStorage(SettingKey.sshUpstreamSocketPath) private var upstreamPath = ""
     @AppStorage(SettingKey.sshSetEnvVar) private var setEnvVar = false
     @AppStorage(SettingKey.sshRememberApprovedApps) private var rememberApps = false
+    @AppStorage(SettingKey.sshApprovalWindow) private var approvalWindow = SSHApprovalWindow.fiveMinutes.rawValue
 
     @State private var decisions: [RememberedSignDecision] = []
     @State private var configInstalled = SSHConfigInstaller.isInstalled()
@@ -104,6 +105,11 @@ struct SSHSettingsView: View {
     @ViewBuilder
     private var trusted: some View {
         Section {
+            Picker("Ask again", selection: $approvalWindow) {
+                ForEach(SSHApprovalWindow.allCases) { window in
+                    Text(window.label).tag(window.rawValue)
+                }
+            }
             Toggle("Stop asking after I approve an app", isOn: $rememberApps)
             if decisions.isEmpty {
                 Text("No trusted apps yet.")
@@ -131,7 +137,7 @@ struct SSHSettingsView: View {
                 }
             }
         } footer: {
-            Text("With the toggle on, an app you approve is trusted and won't ask again. Forgetting one makes it prompt next time. Either way, repeated signatures within a few seconds aren't re-prompted.")
+            Text("One approval covers further signatures from the same program on the same key until the window runs out. Background tools such as an editor's automatic fetch sign every couple of minutes, so \"Every signature\" means a prompt that often. With the toggle on, an app you approve for a key stops asking about it entirely; forgetting it makes it prompt next time.")
         }
     }
 

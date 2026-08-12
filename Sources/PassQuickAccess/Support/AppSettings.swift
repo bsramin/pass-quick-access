@@ -48,6 +48,9 @@ enum SettingKey {
     /// Whether approving an app once stops it prompting again (adds it to the
     /// trusted-apps list); off means every signature asks.
     static let sshRememberApprovedApps = "sshRememberApprovedApps"
+    /// How long one approval covers further signatures from the same program and
+    /// key, in seconds (an `SSHApprovalWindow` raw value).
+    static let sshApprovalWindow = "sshApprovalWindow"
 }
 
 /// What actions an item offers, and so what picking a field does. The detail
@@ -91,6 +94,39 @@ enum SortOrder: String, CaseIterable, Identifiable {
 
     static func current(_ defaults: UserDefaults = .standard) -> SortOrder {
         defaults.string(forKey: SettingKey.sortOrder).flatMap(SortOrder.init) ?? .lastModified
+    }
+}
+
+/// How long one SSH approval covers further signatures from the same program on
+/// the same key.
+enum SSHApprovalWindow: Int, CaseIterable, Identifiable {
+    case everySignature = 0
+    case fiveMinutes = 300
+    case fifteenMinutes = 900
+    case oneHour = 3600
+    case eightHours = 28800
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .everySignature: return "Every signature"
+        case .fiveMinutes: return "After 5 minutes"
+        case .fifteenMinutes: return "After 15 minutes"
+        case .oneHour: return "After 1 hour"
+        case .eightHours: return "After 8 hours"
+        }
+    }
+
+    /// "Every signature" still keeps a few seconds of grace, or one `git push`
+    /// that signs twice would ask twice.
+    var duration: TimeInterval {
+        self == .everySignature ? 15 : TimeInterval(rawValue)
+    }
+
+    static func current(_ defaults: UserDefaults = .standard) -> SSHApprovalWindow {
+        guard defaults.object(forKey: SettingKey.sshApprovalWindow) != nil else { return .fiveMinutes }
+        return SSHApprovalWindow(rawValue: defaults.integer(forKey: SettingKey.sshApprovalWindow)) ?? .fiveMinutes
     }
 }
 

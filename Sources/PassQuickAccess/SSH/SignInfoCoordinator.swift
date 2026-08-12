@@ -26,6 +26,7 @@ final class SignInfoCoordinator {
     private var timeoutTask: Task<Void, Never>?
     private var evaluating = false
     private var isBusy = false
+    private var usesBiometrics = true
 
     /// Called with the authenticated context right after an approval, before the
     /// signature is forwarded, so a dropped session can be restored within the same
@@ -47,38 +48,57 @@ final class SignInfoCoordinator {
 
     private func start(_ request: SignRequest) {
         let auth = BiometricContext()
-        // Embedding the prompt needs biometric hardware. On a Mac without Touch ID
-        // fall back to the ordinary system prompt (which offers the password).
-        guard auth.canEvaluate(.deviceOwnerAuthenticationWithBiometrics) else {
-            Task {
-                let ok = await BiometricAuth.authenticate(reason: Self.reason(for: request), timeout: Self.timeout)
-                finish(ok)
-            }
-            return
-        }
-        self.authContext = auth
+        usesBiometrics = auth.canEvaluate(.deviceOwnerAuthenticationWithBiometrics)
+        authContext = usesBiometrics ? auth : nil
         evaluating = false
-        showCard(for: request, context: auth.context)
+        showCard(for: request, context: usesBiometrics ? auth.context : nil)
+        if !usesBiometrics { startTimeout() }
     }
 
     /// Started from the card's `onAppear`, so the embedded `LAAuthenticationView`
     /// is in the window before the evaluation begins.
     private func evaluate() {
-        guard !evaluating, let auth = authContext, let request = queue.first?.request else { return }
+        guard usesBiometrics, !evaluating, let auth = authContext, let request = queue.first?.request else { return }
         evaluating = true
-
-        timeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.timeout)
-            guard !Task.isCancelled else { return }
-            self?.authContext?.invalidate()
-        }
+        startTimeout()
 
         Task {
-            finish(await runEvaluation(auth: auth, request: request))
+            if let result = await runEvaluation(auth: auth, request: request) { finish(result) }
         }
     }
 
-    private func runEvaluation(auth: BiometricContext, request: SignRequest) async -> Bool {
+    /// The card's approve button on a Mac without Touch ID: the same request,
+    /// answered with the system password prompt.
+    private func approveWithPassword() {
+        guard !evaluating, let request = queue.first?.request else { return }
+        evaluating = true
+        timeoutTask?.cancel()
+        timeoutTask = nil
+
+        Task {
+            let auth = await BiometricAuth.authenticatedContext(
+                reason: Self.reason(for: request), timeout: Self.timeout
+            )
+            if let auth { await onAuthenticated?(auth.context) }
+            finish(auth != nil)
+        }
+    }
+
+    private func startTimeout() {
+        timeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.timeout)
+            guard !Task.isCancelled, let self else { return }
+            if let auth = authContext {
+                auth.invalidate()
+            } else if !evaluating {
+                finish(false)
+            }
+        }
+    }
+
+    /// The user's answer, or nil when the card has been handed over to the
+    /// password path and will report the answer itself.
+    private func runEvaluation(auth: BiometricContext, request: SignRequest) async -> Bool? {
         do {
             let approved = try await auth.evaluate(.deviceOwnerAuthenticationWithBiometrics, reason: Self.reason(for: request))
             // Reuse this Touch ID to restore the session before the signature is
@@ -86,13 +106,17 @@ final class SignInfoCoordinator {
             if approved { await onAuthenticated?(auth.context) }
             return approved
         } catch let error as LAError where Self.biometricsUnusable(error) {
-            // Touch ID is locked out or otherwise unusable. Drop the embedded card
-            // and offer the system prompt, which falls back to the Mac password, so
-            // the user can still approve (and unlocking re-enables Touch ID).
+            // Touch ID is locked out. Swap the card to its password form rather
+            // than tearing it down, so the request it describes stays on screen.
             timeoutTask?.cancel()
             timeoutTask = nil
+            authContext = nil
+            usesBiometrics = false
+            evaluating = false
             hideCard()
-            return await BiometricAuth.authenticate(reason: Self.reason(for: request), timeout: Self.timeout)
+            showCard(for: request, context: nil)
+            startTimeout()
+            return nil
         } catch {
             // Cancels (Deny, timeout) and other failures are a denial.
             return false
@@ -110,10 +134,15 @@ final class SignInfoCoordinator {
         }
     }
 
-    /// Denying (or timing out) cancels the in-flight evaluation, which makes
-    /// `evaluatePolicy` throw and resolves the request as not approved.
+    /// With Touch ID, denying cancels the in-flight evaluation, which makes
+    /// `evaluatePolicy` throw and resolves the request as not approved. On the
+    /// password card there is nothing in flight to cancel.
     private func deny() {
-        authContext?.invalidate()
+        if let authContext {
+            authContext.invalidate()
+        } else if !evaluating {
+            finish(false)
+        }
     }
 
     private func finish(_ approved: Bool) {
@@ -129,7 +158,7 @@ final class SignInfoCoordinator {
         pumpIfIdle()
     }
 
-    private func showCard(for request: SignRequest, context: LAContext) {
+    private func showCard(for request: SignRequest, context: LAContext?) {
         let view = SignInfoView(
             appName: request.client.name,
             keyName: request.keyName ?? "an SSH key",
@@ -137,6 +166,7 @@ final class SignInfoCoordinator {
             unverified: !request.peer.isVerified,
             context: context,
             onAppear: { [weak self] in self?.evaluate() },
+            onApprove: { [weak self] in self?.approveWithPassword() },
             onDeny: { [weak self] in self?.deny() }
         )
 

@@ -12,6 +12,16 @@ struct VerifiedPeer: Sendable, Equatable {
     /// `team:2BUA8C4S2C:com.agilebits...`, or `nil` when the peer couldn't be
     /// anchored to a trustworthy signature.
     let identity: String?
+    /// The binary's code directory hash. It says nothing about who wrote the
+    /// code, so it never backs a persisted decision, but it does pin the exact
+    /// binary, which is enough to scope the short approval window for a peer
+    /// that couldn't be anchored.
+    let codeHash: String?
+
+    init(identity: String?, codeHash: String? = nil) {
+        self.identity = identity
+        self.codeHash = codeHash
+    }
 
     var isVerified: Bool { identity != nil }
 
@@ -47,6 +57,8 @@ enum CodeSignatureCheck {
               !identifier.isEmpty else { return .unverified }
 
         let team = info[kSecCodeInfoTeamIdentifier as String] as? String
+        let codeHash = (info[kSecCodeInfoUnique as String] as? Data)
+            .map { $0.map { String(format: "%02x", $0) }.joined() }
 
         // The signing identifier alone is attacker-controllable: anyone can
         // ad-hoc sign a binary claiming identifier "git" to inherit git's
@@ -55,15 +67,15 @@ enum CodeSignatureCheck {
         // Apple's own tools (/usr/bin/ssh, git from the CLT, …) are signed by
         // Apple with no Team ID; "anchor apple" matches exactly those.
         if satisfies(onDisk, requirement: "anchor apple") {
-            return VerifiedPeer(identity: "platform:\(identifier)")
+            return VerifiedPeer(identity: "platform:\(identifier)", codeHash: codeHash)
         }
         // Third-party code must chain to Apple (Developer ID / App Store) *and*
         // carry a Team ID. The Apple-chain check is essential: without it a
         // self-signed certificate could claim any Team ID it likes.
         if let team, !team.isEmpty, satisfies(onDisk, requirement: "anchor apple generic") {
-            return VerifiedPeer(identity: "team:\(team):\(identifier)")
+            return VerifiedPeer(identity: "team:\(team):\(identifier)", codeHash: codeHash)
         }
-        return .unverified
+        return VerifiedPeer(identity: nil, codeHash: codeHash)
     }
 
     /// Whether the on-disk code validates against a code-signing requirement.

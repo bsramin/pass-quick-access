@@ -1,5 +1,34 @@
 # Changelog
 
+## v2026-08-12.1
+
+### Fixed
+- The SSH agent no longer asks for Touch ID over and over while the Mac sits
+  idle. Anything that speaks to `ssh` in the background, an editor's automatic
+  fetch above all, signs every couple of minutes on its own, and each of those
+  signatures used to be a fresh prompt. One approval now covers further
+  signatures from the same program on the same key for five minutes, and the
+  window is yours to set under Settings → SSH → Trusted Apps, from every
+  signature to eight hours.
+- Two signatures that begin at the same moment share one prompt instead of
+  queueing two.
+- A Mac without Touch ID now gets the same approval card as everyone else,
+  naming the program that is asking and the key it wants, instead of a bare
+  system password box that named neither. Likewise when Touch ID is locked out:
+  the card stays on screen and offers your password.
+- An `ssh` that can't be traced back to a signed identity is no longer condemned
+  to a prompt per signature. It rides the approval window too, pinned to that
+  exact binary, while permanent trust still requires a signature anchored to
+  Apple.
+- An upstream agent that keeps failing to come back is now retried with a
+  widening gap rather than on every connection. Each restart is two `pass-cli`
+  runs and two reads of your local key from the Keychain, which on some setups
+  is a prompt of its own.
+
+### Changed
+- Marking an app trusted now applies to the key you approved rather than to
+  every key in your vaults. Entries made before this keep working as they were.
+
 ## v2026-08-02.2
 
 ### Fixed

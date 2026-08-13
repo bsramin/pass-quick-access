@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The background session check works again on pass-cli 2.2.4 and newer, which
+  dropped the `pass-cli test` command it was built on. Without the command the
+  check concluded that the session was gone every fifteen minutes and on every
+  wake, however healthy it was, and with an access token saved that meant a
+  Touch ID prompt to read it and a restart of the SSH agent behind it, on an
+  idle Mac. The check now asks for the vault list, one request that names your
+  vaults and reads nothing inside them.
+- A pass-cli that doesn't recognise a command is no longer taken to mean the
+  session has lapsed, so the next command Proton retires costs you a wrong
+  answer rather than a reconnect on every tick.
+
 ## v2026-08-12.1
 
 ### Fixed

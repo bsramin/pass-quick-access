@@ -36,6 +36,18 @@ extension PassCLIError {
             || message.contains("log in")
     }
 
+    /// True when the CLI refused the command itself rather than failing to carry
+    /// it out, which is what a subcommand dropped by a newer pass-cli looks like
+    /// from here. It says nothing about the session, so callers must not read it
+    /// as a lapsed one.
+    var isUnsupportedCommand: Bool {
+        guard case let .commandFailed(_, stderr) = self else { return false }
+        let message = stderr.lowercased()
+        return message.contains("unrecognized subcommand")
+            || message.contains("unexpected argument")
+            || message.contains("unknown command")
+    }
+
     /// True when a command failed because the locally stored session can't be
     /// decrypted (its key is missing or changed). A forced logout clears it.
     var isCorruptLocalSession: Bool {

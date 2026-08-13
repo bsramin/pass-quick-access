@@ -159,6 +159,26 @@ final class PassCLIClientTests: XCTestCase {
         XCTAssertFalse(error.isAuthenticationFailure)
     }
 
+    func testSessionProbeAsksForTheVaultListOnly() async {
+        let runner = CapturingRunner()
+        let client = PassCLIClient(executable: executable, runner: runner)
+
+        try? await client.verifySession()
+
+        XCTAssertEqual(runner.arguments, ["vault", "list"])
+    }
+
+    func testARemovedSubcommandReadsAsUnsupportedRatherThanSignedOut() async {
+        let error = PassCLIError.commandFailed(status: 2, stderr: "error: unrecognized subcommand 'test'")
+        XCTAssertTrue(error.isUnsupportedCommand)
+        XCTAssertFalse(error.isAuthenticationFailure)
+
+        let runner = FakeProcessRunner(stdout: "", stderr: "error: unrecognized subcommand 'test'", status: 2)
+        let client = PassCLIClient(executable: executable, runner: runner)
+        let hasSession = await client.hasSession()
+        XCTAssertTrue(hasSession, "an unrecognised probe says nothing about the session")
+    }
+
     func testSessionLockSerialisesConcurrentHolders() async {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("pqa-session-lock-\(UUID().uuidString)")

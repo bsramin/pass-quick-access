@@ -14,7 +14,7 @@ final class SessionKeepaliveTests: XCTestCase {
 
         await keepalive.ping()
 
-        XCTAssertEqual(runner.commands, [["test"]], "a keepalive that listed items would fight the SSH agent for the session lock")
+        XCTAssertEqual(runner.commands, [["vault", "list"]], "a keepalive that listed items would fight the SSH agent for the session lock")
         XCTAssertFalse(reportedLost)
     }
 
@@ -24,6 +24,16 @@ final class SessionKeepaliveTests: XCTestCase {
         await keepalive.ping()
 
         XCTAssertTrue(reportedLost)
+    }
+
+    func testACommandTheCLIDoesNotKnowIsNotALapsedSession() async {
+        let keepalive = makeKeepalive(runner: RecordingRunner(
+            status: 2, stderr: "error: unrecognized subcommand 'vault'"
+        ))
+
+        await keepalive.ping()
+
+        XCTAssertFalse(reportedLost, "a pass-cli that dropped the probe must not trigger a reconnect every tick")
     }
 
     func testStoppingLeavesNoPingBehind() async {

@@ -29,8 +29,11 @@ actor PassCLIClient {
 
     /// Verifies the stored session can reach the server. Throws a
     /// `PassCLIError` whose `isAuthenticationFailure` flags a re-login.
+    ///
+    /// `vault list` is the probe: one round trip that names the vaults and reads
+    /// nothing inside them. It was `pass-cli test` until 2.2.4 dropped it.
     func verifySession() async throws {
-        _ = try await execute(["test"])
+        _ = try await execute(["vault", "list"])
     }
 
     /// Whether `pass-cli` currently has a usable session. Unlike `verifySession`
@@ -38,6 +41,11 @@ actor PassCLIClient {
     func hasSession() async -> Bool {
         do {
             try await verifySession()
+            return true
+        } catch let error as PassCLIError where error.isUnsupportedCommand {
+            // A pass-cli that doesn't know the probe has told us nothing about
+            // the session. Answering "gone" would send every caller off to
+            // reconnect on a session that is fine, once per tick, forever.
             return true
         } catch {
             return false

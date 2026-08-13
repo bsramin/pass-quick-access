@@ -5,10 +5,11 @@ import Foundation
 /// Keeps the `pass-cli` session from going cold while the app sits in the menu
 /// bar, so the next hotkey press doesn't pay for a reconnect first.
 ///
-/// The ping is `pass-cli test` and nothing more. Re-reading the vaults would
-/// refresh the session just as well, but that is one `item list` per vault and
-/// each holds the cross-process session lock, so a periodic index pass would sit
-/// in front of an SSH signature the user is waiting on.
+/// The ping is a single `vault list` and nothing more: it names the vaults and
+/// reads nothing inside them. Re-reading the index would refresh the session
+/// just as well, but that is one `item list` per vault and each holds the
+/// cross-process session lock, so a periodic index pass would sit in front of an
+/// SSH signature the user is waiting on.
 @MainActor
 final class SessionKeepalive {
     private let client: PassCLIClient

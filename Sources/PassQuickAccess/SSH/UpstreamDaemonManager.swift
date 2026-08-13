@@ -37,10 +37,12 @@ struct UpstreamDaemonManager: Sendable {
     /// it, so signatures fail ("Permission denied") until it's restarted with the
     /// current session. Returns whether the socket is reachable when it finishes.
     func restart() async -> Bool {
-        // A daemon can linger in a "degraded" state (process alive, socket gone),
-        // and that blocks a fresh `start` with "already running". Stop first so the
-        // restart can recreate the socket; harmless when nothing is running.
-        _ = try? await run(["ssh-agent", "daemon", "stop"], timeout: .seconds(10))
+        // A daemon can linger with its process alive and its socket gone, which
+        // blocks a fresh `start` with "already running". Asking first is local and
+        // near-free, and `start` clears a stale socket on its own.
+        if await daemonState() != .stopped {
+            _ = try? await run(["ssh-agent", "daemon", "stop"], timeout: .seconds(10))
+        }
 
         var startArguments = ["ssh-agent", "daemon", "start", "--socket-path", UnixSocket.expand(socketPath)]
         if let vaultFilter, !vaultFilter.isEmpty {
@@ -55,6 +57,33 @@ struct UpstreamDaemonManager: Sendable {
             try? await Task.sleep(for: .milliseconds(250))
         }
         return isReachable()
+    }
+
+    /// What the daemon reports about itself. `unknown` (wording we don't know, or
+    /// a pass-cli older than 2.3) keeps the caller's unconditional stop.
+    enum DaemonState {
+        case running, stopped, unknown
+    }
+
+    private func daemonState() async -> DaemonState {
+        // No session lock: this reads a PID file and pokes a socket, nothing more.
+        guard let result = try? await runner.run(
+            executable: executable,
+            arguments: ["ssh-agent", "daemon", "status"],
+            timeout: .seconds(5)
+        ), result.status == 0 else { return .unknown }
+        return Self.state(fromStatus: String(decoding: result.stdout, as: UTF8.self))
+    }
+
+    /// Reads the state off the `daemon status` report. It has to come from the
+    /// text: the command exits 0 whether the daemon is up or down.
+    static func state(fromStatus output: String) -> DaemonState {
+        let line = output.lowercased()
+            .split(separator: "\n")
+            .first { $0.contains("status:") }
+        guard let line else { return .unknown }
+        if line.contains("stopped") || line.contains("not running") { return .stopped }
+        return line.contains("running") ? .running : .unknown
     }
 
     private func run(_ arguments: [String], timeout: Duration) async throws -> ProcessResult {

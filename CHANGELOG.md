@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## v2026-08-13.1
 
 ### Fixed
 - The background session check works again on pass-cli 2.2.4 and newer, which
@@ -13,6 +13,12 @@
 - A pass-cli that doesn't recognise a command is no longer taken to mean the
   session has lapsed, so the next command Proton retires costs you a wrong
   answer rather than a reconnect on every tick.
+
+### Changed
+- Bringing the SSH agent back asks pass-cli whether its daemon is running before
+  stopping it, rather than always stopping it first. The question is free and
+  local, the stop was neither, and it is now spent only when there is something
+  to stop. On a pass-cli too old to answer, nothing changes.
 
 ## v2026-08-12.1
 

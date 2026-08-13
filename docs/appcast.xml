@@ -3,6 +3,34 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-08-13.1</title>
+      <pubDate>Thu, 13 Aug 2026 10:03:14 +0000</pubDate>
+      <sparkle:version>20260813.1</sparkle:version>
+      <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>
+### Fixed
+- The background session check works again on pass-cli 2.2.4 and newer, which
+  dropped the `pass-cli test` command it was built on. Without the command the
+  check concluded that the session was gone every fifteen minutes and on every
+  wake, however healthy it was, and with an access token saved that meant a
+  Touch ID prompt to read it and a restart of the SSH agent behind it, on an
+  idle Mac. The check now asks for the vault list, one request that names your
+  vaults and reads nothing inside them.
+- A pass-cli that doesn't recognise a command is no longer taken to mean the
+  session has lapsed, so the next command Proton retires costs you a wrong
+  answer rather than a reconnect on every tick.
+
+### Changed
+- Bringing the SSH agent back asks pass-cli whether its daemon is running before
+  stopping it, rather than always stopping it first. The question is free and
+  local, the stop was neither, and it is now spent only when there is something
+  to stop. On a pass-cli too old to answer, nothing changes.
+
+</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-08-13.1/PassQuickAccess.zip" sparkle:edSignature="IqS0oJafpYb3fhFDsf2ifMR1SYbYcYn49lkyH7MJy1vHMxkcVSZ2eZeia5Ornt828MXKG6tRSQ4bjO40vv/CCA==" length="4501794" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-08-12.1</title>
       <pubDate>Wed, 12 Aug 2026 16:48:32 +0000</pubDate>
       <sparkle:version>20260812.1</sparkle:version>

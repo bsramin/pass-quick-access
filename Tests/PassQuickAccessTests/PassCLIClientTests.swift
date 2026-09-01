@@ -108,6 +108,20 @@ final class PassCLIClientTests: XCTestCase {
         XCTAssertEqual(String(describing: code), "••••••")
     }
 
+    func testUserFacingReadsGiveUpSoonerThanTheIndex() async throws {
+        // A password or a code is read with the panel open and the user waiting on
+        // it, so it must not sit on the deadline an index is worth.
+        let runner = TimeoutRecordingRunner()
+        let client = PassCLIClient(executable: executable, runner: runner, timeout: .seconds(15), fieldTimeout: .seconds(8))
+        let item = ItemReference(shareID: "s1", itemID: "i1")
+
+        _ = try await client.password(for: item)
+        _ = try await client.totp(for: item)
+        _ = try await client.vaults()
+
+        XCTAssertEqual(runner.timeouts, [.seconds(8), .seconds(8), .seconds(15)])
+    }
+
     func testEmptyFieldThrows() async throws {
         let runner = FakeProcessRunner(stdout: "   \n")
         let client = PassCLIClient(executable: executable, runner: runner)
@@ -261,6 +275,28 @@ private func singleLoginJSON(share: String) -> String {
 }
 
 // MARK: - Test doubles & helpers
+
+/// Records the deadline every command is given, so a test can prove the reads
+/// the user waits on are not held to the index's.
+private final class TimeoutRecordingRunner: ProcessRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [Duration] = []
+
+    var timeouts: [Duration] { lock.withLock { recorded } }
+
+    func run(executable: URL, arguments: [String], environment: [String: String]?, timeout: Duration) async throws -> ProcessResult {
+        lock.withLock { recorded.append(timeout) }
+        let stdout: String
+        if arguments.contains("vault") {
+            stdout = #"{"vaults": [{"name": "Personal", "vault_id": "v1", "share_id": "s1"}]}"#
+        } else if arguments.contains("totp") {
+            stdout = #"{"totp_uri": "281898", "totp": "281898"}"#
+        } else {
+            stdout = "hunter2"
+        }
+        return ProcessResult(status: 0, stdout: Data(stdout.utf8), stderr: Data())
+    }
+}
 
 private struct FakeProcessRunner: ProcessRunning {
     private let handler: @Sendable ([String]) -> ProcessResult

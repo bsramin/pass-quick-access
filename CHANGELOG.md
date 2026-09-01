@@ -1,5 +1,23 @@
 # Changelog
 
+## v2026-09-01.1
+
+### Fixed
+- A fill or a copy no longer looks like it did nothing while Proton Pass is
+  down. Reading a password or a one-time code is a request to Proton, and when
+  the service is out that request runs all the way to its timeout: the panel sat
+  there, said nothing, and the key press read as lost. It now puts a spinner up
+  once a read has taken more than a moment, and says "Proton Pass isn't
+  responding, try again" when the read gives up, instead of blaming the item it
+  was reading. A read you are waiting on now gives up after eight seconds rather
+  than fifteen; indexing your vaults, which nobody is watching, keeps the longer
+  deadline.
+- Pressing the shortcut again while a read is still out no longer starts a
+  second one. pass-cli runs a single command at a time, so the retries queued
+  behind the stalled read and each press made the wait longer.
+- A refresh from the menu that can't reach Proton says so, rather than leaving
+  the list as it was with no sign that anything happened.
+
 ## v2026-08-13.1
 
 ### Fixed

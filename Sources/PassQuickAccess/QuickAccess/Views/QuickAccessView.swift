@@ -372,18 +372,30 @@ struct QuickAccessView: View {
             .overlay(alignment: .top) { Divider() }
     }
 
+    /// The capsule at the bottom of the panel. A read still waiting on Proton
+    /// takes it over with a spinner, so a slow or unreachable server looks like
+    /// work in progress rather than a key press that went nowhere.
     @ViewBuilder
     private var toast: some View {
-        if let toast = viewModel.toast {
-            Text(toast)
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(.separator))
-                .padding(.bottom, 42)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+        if let busy = viewModel.busyMessage {
+            capsule {
+                ProgressView().controlSize(.small).scaleEffect(0.6)
+                Text(busy)
+            }
+        } else if let toast = viewModel.toast {
+            capsule { Text(toast) }
         }
+    }
+
+    private func capsule<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        HStack(spacing: 6) { content() }
+            .font(.system(size: 12, weight: .medium))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(.separator))
+            .padding(.bottom, 42)
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     private func hint(_ key: String, _ label: String) -> some View {

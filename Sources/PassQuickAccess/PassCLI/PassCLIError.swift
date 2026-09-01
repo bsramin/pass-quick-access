@@ -36,6 +36,27 @@ extension PassCLIError {
             || message.contains("log in")
     }
 
+    /// True when the command failed because pass-cli could not reach Proton
+    /// rather than because anything was wrong with the request: a timeout, or a
+    /// network or server error it reported. Worth its own message, since the
+    /// only thing the user can do about it is try again later.
+    var isServiceUnreachable: Bool {
+        if case .timedOut = self { return true }
+        guard case let .commandFailed(_, stderr) = self else { return false }
+        let message = stderr.lowercased()
+        return message.contains("connection")
+            || message.contains("timed out")
+            || message.contains("timeout")
+            || message.contains("network")
+            || message.contains("could not resolve")
+            || message.contains("dns error")
+            || message.contains("temporarily unavailable")
+            || message.contains("service unavailable")
+            || message.contains("bad gateway")
+            || message.contains("502")
+            || message.contains("503")
+    }
+
     /// True when the CLI refused the command itself rather than failing to carry
     /// it out, which is what a subcommand dropped by a newer pass-cli looks like
     /// from here. It says nothing about the session, so callers must not read it

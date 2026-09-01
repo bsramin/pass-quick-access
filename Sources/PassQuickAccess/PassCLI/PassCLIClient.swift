@@ -12,6 +12,11 @@ actor PassCLIClient {
     private let executable: URL
     private let runner: ProcessRunning
     private let timeout: Duration
+    /// The deadline for reading one field, which always happens with the user
+    /// waiting on it. Shorter than the rest: an index can be worth a long wait,
+    /// a password the user asked for a moment ago is better answered with "try
+    /// again" than with fifteen seconds of nothing.
+    private let fieldTimeout: Duration
     private let decoder = JSONDecoder()
 
     /// Gate that lets only one `pass-cli` process run at a time. The actor alone
@@ -21,10 +26,16 @@ actor PassCLIClient {
     private var isExecuting = false
     private var executionWaiters: [CheckedContinuation<Void, Never>] = []
 
-    init(executable: URL, runner: ProcessRunning = SystemProcessRunner(), timeout: Duration = .seconds(15)) {
+    init(
+        executable: URL,
+        runner: ProcessRunning = SystemProcessRunner(),
+        timeout: Duration = .seconds(15),
+        fieldTimeout: Duration = .seconds(8)
+    ) {
         self.executable = executable
         self.runner = runner
         self.timeout = timeout
+        self.fieldTimeout = fieldTimeout
     }
 
     /// Verifies the stored session can reach the server. Throws a
@@ -140,7 +151,7 @@ actor PassCLIClient {
             "--share-id", item.shareID,
             "--item-id", item.itemID,
             "--output", "json",
-        ])
+        ], timeout: fieldTimeout)
         return SensitiveString(response.code)
     }
 
@@ -152,14 +163,14 @@ actor PassCLIClient {
             "--share-id", item.shareID,
             "--item-id", item.itemID,
             "--field", name,
-        ])
+        ], timeout: fieldTimeout)
         return try string(from: output)
     }
 
     // MARK: - Command plumbing
 
-    private func json<T: Decodable>(_ arguments: [String]) async throws -> T {
-        let result = try await execute(arguments)
+    private func json<T: Decodable>(_ arguments: [String], timeout: Duration? = nil) async throws -> T {
+        let result = try await execute(arguments, timeout: timeout)
         do {
             return try decoder.decode(T.self, from: result.stdout)
         } catch {
@@ -174,7 +185,13 @@ actor PassCLIClient {
         return text
     }
 
-    private func execute(_ arguments: [String], environment: [String: String]? = nil) async throws -> ProcessResult {
+    /// Runs one `pass-cli` command. `timeout` overrides the client's default for
+    /// the commands the user is sitting in front of.
+    private func execute(
+        _ arguments: [String],
+        environment: [String: String]? = nil,
+        timeout: Duration? = nil
+    ) async throws -> ProcessResult {
         await acquireExecutionSlot()
         defer { releaseExecutionSlot() }
 
@@ -184,7 +201,12 @@ actor PassCLIClient {
         let lock = await SessionLock.acquire()
         defer { lock?.release() }
 
-        let result = try await runner.run(executable: executable, arguments: arguments, environment: environment, timeout: timeout)
+        let result = try await runner.run(
+            executable: executable,
+            arguments: arguments,
+            environment: environment,
+            timeout: timeout ?? self.timeout
+        )
         guard result.status == 0 else {
             let stderr = String(decoding: result.stderr, as: UTF8.self)
             throw PassCLIError.commandFailed(status: result.status, stderr: stderr)

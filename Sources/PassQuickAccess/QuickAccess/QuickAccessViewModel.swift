@@ -80,6 +80,12 @@ final class QuickAccessViewModel: ObservableObject {
     /// sign-in prompt rather than plain error text.
     static let signedOutMessage = "Signed out of Proton Pass"
 
+    /// Shown while a field read is still waiting on Proton, and after one gives
+    /// up. Both name the service, since neither is anything the item or the app
+    /// did wrong: the answer is to try again in a moment.
+    static let waitingMessage = "Waiting for Proton Pass…"
+    static let unreachableMessage = "Proton Pass isn't responding, try again"
+
     @Published var query = "" {
         // Only refilter on a real change: a no-op rewrite (e.g. the text field
         // rebinding when the panel reopens) must not reset a resumed detail view.
@@ -103,6 +109,11 @@ final class QuickAccessViewModel: ObservableObject {
     /// Whether a stored access token offers a one-tap reconnect from signed-out.
     @Published var canReconnect = false
     @Published var toast: String?
+    /// Non-nil once a value read has been in flight long enough to be worth
+    /// saying so. Reading a field is one round trip to Proton, and when the
+    /// service is down that trip runs to the timeout: without this the panel
+    /// just sits there and the action looks like it did nothing.
+    @Published private(set) var busyMessage: String?
     /// Bumped on each copy so the view can flash the selection.
     @Published private(set) var copyFlashes = 0
     /// Non-nil while the detail view is open for an item.
@@ -144,6 +155,13 @@ final class QuickAccessViewModel: ObservableObject {
     /// is instant. Holds at most one secret, cleared when the panel hides.
     private var prefetchTask: Task<Void, Never>?
     private var prefetchedPassword: (reference: ItemReference, value: SensitiveString)?
+    /// True while an action is waiting on a value read, so a second press is
+    /// dropped rather than queued: pass-cli runs one command at a time, and
+    /// stacking retries behind a stalled one only makes the wait longer.
+    private var isFetching = false
+    /// Puts `busyMessage` up once a read passes this, short enough to catch a
+    /// stalled server and long enough that a normal read stays silent.
+    private let busyNoticeDelay: Duration
     /// When the user last completed an action, and on which item, used to resume
     /// into that item's detail view if the panel is reopened shortly after.
     private var lastActionAt: Date?
@@ -165,10 +183,16 @@ final class QuickAccessViewModel: ObservableObject {
     /// because several items matched it. Keeps the list visible with no query.
     @Published private(set) var contextListActive = false
 
-    init(client: PassCLIClient, usage: UsageTracker = UsageTracker(), indexFreshness: TimeInterval = 300) {
+    init(
+        client: PassCLIClient,
+        usage: UsageTracker = UsageTracker(),
+        indexFreshness: TimeInterval = 300,
+        busyNoticeDelay: Duration = .milliseconds(400)
+    ) {
         self.client = client
         self.usage = usage
         self.indexFreshness = indexFreshness
+        self.busyNoticeDelay = busyNoticeDelay
     }
 
     /// Whether the most-used opt-in is on, so the list floats frequently used
@@ -373,6 +397,11 @@ final class QuickAccessViewModel: ObservableObject {
             _ = await onSilentReconnect?()
             return
         } catch {
+            // The list on screen still stands, so this stays a toast rather than
+            // an error state. Silence would read as a refresh that did nothing.
+            if let cliError = error as? PassCLIError, cliError.isServiceUnreachable {
+                toast = Self.unreachableMessage
+            }
             return
         }
 
@@ -420,6 +449,9 @@ final class QuickAccessViewModel: ObservableObject {
             return .signedOut
         } catch {
             guard accumulated.isEmpty else { loadState = .ready; loadingDetail = nil; return .partial }
+            if let cliError = error as? PassCLIError, cliError.isServiceUnreachable {
+                return .failed(Self.unreachableMessage)
+            }
             return .failed(String(describing: error))
         }
     }
@@ -513,12 +545,16 @@ final class QuickAccessViewModel: ObservableObject {
 
     func perform(_ action: ItemAction) async {
         guard let item = actionTarget, availableActions.contains(action) else { return }
+        // One read at a time. Pressing again while Proton Pass is slow to answer
+        // used to spawn a second command that queued behind the first, so the
+        // panel stayed silent for even longer.
+        guard !isFetching else { return }
         let submit = UserDefaults.standard.bool(forKey: SettingKey.autotypeSubmitOnFill)
         switch action {
         case .fillLogin:
             guard let account = item.account else { return }
             do {
-                let secret = try await password(for: item.reference)
+                let secret = try await fetching { try await self.password(for: item.reference) }
                 requestAutotype(AutotypeRequest(steps: AutoTypePlan.login(username: account, submit: submit), secret: secret))
             } catch {
                 report(error, fallback: "Couldn't read the password")
@@ -528,14 +564,14 @@ final class QuickAccessViewModel: ObservableObject {
             requestAutotype(AutotypeRequest(steps: AutoTypePlan.username(account)))
         case .fillPassword:
             do {
-                let secret = try await password(for: item.reference)
+                let secret = try await fetching { try await self.password(for: item.reference) }
                 requestAutotype(AutotypeRequest(steps: AutoTypePlan.password(submit: submit), secret: secret))
             } catch {
                 report(error, fallback: "Couldn't read the password")
             }
         case .fillTOTP:
             do {
-                let code = try await client.totp(for: item.reference)
+                let code = try await fetching { try await self.client.totp(for: item.reference) }
                 requestAutotype(AutotypeRequest(steps: AutoTypePlan.code(submit: submit), code: code))
             } catch {
                 report(error, fallback: "No one-time code for this item")
@@ -548,7 +584,7 @@ final class QuickAccessViewModel: ObservableObject {
             finish(with: "Username copied")
         case .copyPassword:
             do {
-                Clipboard.copy(secret: try await password(for: item.reference))
+                Clipboard.copy(secret: try await fetching { try await self.password(for: item.reference) })
                 usage.record(item.id)
                 registerCopy(.copyPassword)
                 finish(with: "Password copied")
@@ -557,7 +593,7 @@ final class QuickAccessViewModel: ObservableObject {
             }
         case .copyTOTP:
             do {
-                Clipboard.copy(secret: try await client.totp(for: item.reference))
+                Clipboard.copy(secret: try await fetching { try await self.client.totp(for: item.reference) })
                 usage.record(item.id)
                 registerCopy(.copyTOTP)
                 finish(with: "One-time code copied")
@@ -586,6 +622,7 @@ final class QuickAccessViewModel: ObservableObject {
     /// and leaves the panel up; it hides on its own when the window takes focus.
     func reveal(_ action: ItemAction) async {
         guard let item = actionTarget, availableActions.contains(action) else { return }
+        guard !isFetching else { return }
         // Remember where we were so closing the large-type window restores it.
         revealResume = (item: item, inDetail: isShowingDetail, action: action)
         // A fill action reveals the field it would type: the login and password
@@ -597,14 +634,14 @@ final class QuickAccessViewModel: ObservableObject {
             onReveal?(RevealRequest(title: item.title, field: "Username", value: account))
         case .copyPassword, .fillLogin, .fillPassword:
             do {
-                let secret = try await password(for: item.reference)
+                let secret = try await fetching { try await self.password(for: item.reference) }
                 onReveal?(RevealRequest(title: item.title, field: "Password", value: secret.reveal()))
             } catch {
                 report(error, fallback: "Couldn't read the password")
             }
         case .copyTOTP, .fillTOTP:
             do {
-                let code = try await client.totp(for: item.reference)
+                let code = try await fetching { try await self.client.totp(for: item.reference) }
                 onReveal?(RevealRequest(title: item.title, field: "One-Time Code", value: code.reveal()))
             } catch {
                 report(error, fallback: "No one-time code for this item")
@@ -612,6 +649,28 @@ final class QuickAccessViewModel: ObservableObject {
         case .openInBrowser:
             break
         }
+    }
+
+    // MARK: - Waiting on a value
+
+    /// Runs a value read with the panel able to say it is working. A read that
+    /// lands quickly shows nothing; one still going after `busyNoticeDelay` puts
+    /// a notice up, which stays until the value arrives or the read fails and a
+    /// toast takes its place.
+    private func fetching<T>(_ work: () async throws -> T) async throws -> T {
+        isFetching = true
+        let notice = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: self.busyNoticeDelay)
+            guard !Task.isCancelled else { return }
+            self.busyMessage = Self.waitingMessage
+        }
+        defer {
+            notice.cancel()
+            busyMessage = nil
+            isFetching = false
+        }
+        return try await work()
     }
 
     // MARK: - Password prefetch
@@ -755,7 +814,17 @@ final class QuickAccessViewModel: ObservableObject {
     /// wherever it happens: try a silent reconnect first, and only show the
     /// signed-out prompt if the token can't bring the session back.
     private func report(_ error: Error, fallback: String) {
-        guard let cliError = error as? PassCLIError, cliError.isAuthenticationFailure else {
+        guard let cliError = error as? PassCLIError else {
+            toast = fallback
+            return
+        }
+        // A timeout or a network error says nothing about the item, so the
+        // per-action fallback ("No one-time code for this item") would be a lie.
+        guard !cliError.isServiceUnreachable else {
+            toast = Self.unreachableMessage
+            return
+        }
+        guard cliError.isAuthenticationFailure else {
             toast = fallback
             return
         }

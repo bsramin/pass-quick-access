@@ -3,6 +3,32 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-09-01.1</title>
+      <pubDate>Tue, 01 Sep 2026 16:21:21 +0000</pubDate>
+      <sparkle:version>20260901.1</sparkle:version>
+      <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>
+### Fixed
+- A fill or a copy no longer looks like it did nothing while Proton Pass is
+  down. Reading a password or a one-time code is a request to Proton, and when
+  the service is out that request runs all the way to its timeout: the panel sat
+  there, said nothing, and the key press read as lost. It now puts a spinner up
+  once a read has taken more than a moment, and says "Proton Pass isn't
+  responding, try again" when the read gives up, instead of blaming the item it
+  was reading. A read you are waiting on now gives up after eight seconds rather
+  than fifteen; indexing your vaults, which nobody is watching, keeps the longer
+  deadline.
+- Pressing the shortcut again while a read is still out no longer starts a
+  second one. pass-cli runs a single command at a time, so the retries queued
+  behind the stalled read and each press made the wait longer.
+- A refresh from the menu that can't reach Proton says so, rather than leaving
+  the list as it was with no sign that anything happened.
+
+</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-09-01.1/PassQuickAccess.zip" sparkle:edSignature="LtQAfzEVYLVfQu17YpJ6TR/bFm43Lc/AOBJ57wsgtQ61Gl6mTmkkhHBMIsaagacJOuXa/ifnz3DZiY8aeXdWBg==" length="4533665" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-08-13.1</title>
       <pubDate>Thu, 13 Aug 2026 10:03:14 +0000</pubDate>
       <sparkle:version>20260813.1</sparkle:version>

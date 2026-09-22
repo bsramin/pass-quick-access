@@ -178,9 +178,22 @@ final class AutoFillServer: @unchecked Sendable {
         // A service identifier is a bare domain or a full URL depending on who
         // is asking; WebHost copes with both and drops a leading "www.".
         let hosts = services.compactMap(WebHost.from)
-        let items = index.autofillItems(matchingHosts: hosts)
-        let wanted = kind == .oneTimeCode ? items.filter(\.hasTOTP) : items.filter(\.hasPassword)
-        return .matches(wanted.map(Self.candidate))
+        let matched = index.autofillItems(matchingHosts: hosts)
+        let matchedIDs = Set(matched.map(\.id))
+        // Everything else follows the matches rather than being withheld. Host
+        // matching is a good guess and no more: plenty of Google logins are
+        // saved against gmail.com, and an item with no URL at all matches
+        // nothing by construction while still being the one the user wants.
+        let rest = hosts.isEmpty
+            ? []
+            : index.autofillItems(matchingHosts: []).filter { !matchedIDs.contains($0.id) }
+        let usable: (ItemSummary) -> Bool = kind == .oneTimeCode
+            ? { $0.hasTOTP }
+            : { $0.hasPassword }
+        return .matches(
+            matched.filter(usable).map { Self.candidate($0, matchesSite: true) }
+                + rest.filter(usable).map { Self.candidate($0, matchesSite: false) }
+        )
     }
 
     @MainActor
@@ -227,13 +240,17 @@ final class AutoFillServer: @unchecked Sendable {
         return state(authenticated: request.authenticated)
     }
 
-    private static func candidate(_ item: ItemSummary) -> AutoFillWire.Response.Candidate {
+    private static func candidate(
+        _ item: ItemSummary,
+        matchesSite: Bool
+    ) -> AutoFillWire.Response.Candidate {
         AutoFillWire.Response.Candidate(
             recordIdentifier: item.id,
             title: item.title,
             account: item.account,
             vaultName: item.vaultName,
-            hasOneTimeCode: item.hasTOTP
+            hasOneTimeCode: item.hasTOTP,
+            matchesSite: matchesSite
         )
     }
 

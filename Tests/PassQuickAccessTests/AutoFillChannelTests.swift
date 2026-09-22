@@ -132,6 +132,7 @@ final class AutoFillServerTests: XCTestCase {
             .matches(services: [], kind: .password), index: index
         ).body else { return XCTFail("expected matches") }
         XCTAssertEqual(all.map(\.title), ["With code", "Password only"])
+        XCTAssertTrue(all.allSatisfy(\.matchesSite), "with no site asked, everything is a match")
 
         guard case let .matches(codes) = try await exchange(
             .matches(services: [], kind: .oneTimeCode), index: index

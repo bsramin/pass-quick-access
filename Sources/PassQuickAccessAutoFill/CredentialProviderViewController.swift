@@ -141,7 +141,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
                 title: identity.serviceIdentifier.identifier,
                 account: identity.user,
                 vaultName: nil,
-                hasOneTimeCode: kind == .oneTimeCode
+                hasOneTimeCode: kind == .oneTimeCode,
+                matchesSite: true
             ),
             from: model,
             kind: kind

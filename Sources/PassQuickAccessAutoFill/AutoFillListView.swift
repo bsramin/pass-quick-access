@@ -32,6 +32,8 @@ struct AutoFillListView: View {
                 search
                 Divider()
                 list
+                Divider()
+                footer
             case .locked:
                 centered { locked }
             case let .message(text):
@@ -43,6 +45,7 @@ struct AutoFillListView: View {
         // host may honour or ignore, and a fixed frame in here would leave a
         // margin of dead space when it ignores it.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onExitCommand(perform: onCancel)
     }
 
     private var search: some View {
@@ -57,15 +60,39 @@ struct AutoFillListView: View {
 
     private var list: some View {
         ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(model.visible, id: \.recordIdentifier) { candidate in
-                    row(candidate)
-                        .contentShape(Rectangle())
-                        .onTapGesture { onPick(candidate) }
+            LazyVStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(model.sections.enumerated()), id: \.offset) { _, section in
+                    if let heading = section.heading {
+                        Text(heading)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 8)
+                            .padding(.bottom, 2)
+                    }
+                    ForEach(section.candidates, id: \.recordIdentifier) { candidate in
+                        row(candidate)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onPick(candidate) }
+                    }
                 }
             }
             .padding(6)
         }
+    }
+
+    /// Escape is handled by the host in some places and not others, so the way
+    /// out is always on screen as well.
+    private var footer: some View {
+        HStack {
+            Spacer()
+            Button("Cancel", action: onCancel)
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 32)
     }
 
     private func row(_ candidate: AutoFillWire.Response.Candidate) -> some View {

@@ -90,6 +90,12 @@ enum AutoFillWire {
             let account: String?
             let vaultName: String?
             let hasOneTimeCode: Bool
+            /// Whether this one matches the site that asked. The rest of the
+            /// vault is sent too, under a heading, because a login saved
+            /// against gmail.com is the one you want on a google.com form and
+            /// no matching rule is ever going to know that. It also makes the
+            /// search field honest: it can only filter what was sent.
+            let matchesSite: Bool
         }
 
         enum Failure: String, Codable, Sendable {

@@ -28,16 +28,30 @@ final class AutoFillListModel: ObservableObject {
     @Published private(set) var note: String?
     @Published private(set) var candidates: [AutoFillWire.Response.Candidate] = []
 
-    /// What the user typed, matched against what a row shows. The app already
-    /// narrowed the list to the site in question; this is for the case where it
-    /// matched nothing and the whole vault is on screen.
-    var visible: [AutoFillWire.Response.Candidate] {
+    struct Section {
+        let heading: String?
+        let candidates: [AutoFillWire.Response.Candidate]
+    }
+
+    /// The logins for this site first, then everything else under a heading.
+    /// Searching flattens the two, because once someone is typing a name they
+    /// are past caring which of them the site matched.
+    var sections: [Section] {
         let trimmed = query.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !trimmed.isEmpty else { return candidates }
-        return candidates.filter {
-            $0.title.lowercased().contains(trimmed)
-                || ($0.account ?? "").lowercased().contains(trimmed)
+        guard trimmed.isEmpty else {
+            return [Section(heading: nil, candidates: candidates.filter { matches($0, trimmed) })]
         }
+        let forSite = candidates.filter(\.matchesSite)
+        let rest = candidates.filter { !$0.matchesSite }
+        return [
+            forSite.isEmpty ? nil : Section(heading: nil, candidates: forSite),
+            rest.isEmpty ? nil : Section(heading: forSite.isEmpty ? nil : "All logins", candidates: rest),
+        ].compactMap { $0 }
+    }
+
+    private func matches(_ candidate: AutoFillWire.Response.Candidate, _ query: String) -> Bool {
+        candidate.title.lowercased().contains(query)
+            || (candidate.account ?? "").lowercased().contains(query)
     }
 
     private let services: [String]

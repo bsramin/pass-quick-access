@@ -872,7 +872,12 @@ final class QuickAccessViewModel: ObservableObject {
 /// secret, and the reference handed back for a record identifier is the one from
 /// the index rather than anything a caller supplied.
 extension QuickAccessViewModel: AutoFillIndexSource {
-    var autofillIsIndexReady: Bool { loadState == .ready }
+    /// Ready means every vault, not merely the first. `loadState` turns `.ready`
+    /// as soon as one vault lands so the panel can show it while the rest
+    /// stream in, which is right for a list a user is watching and wrong for a
+    /// question asked once: answering then returns whichever vaults happened to
+    /// have arrived, and the login someone is looking for is quietly missing.
+    var autofillIsIndexReady: Bool { loadState == .ready && !isIndexing }
 
     var autofillIsSignedOut: Bool { isSignedOut }
 

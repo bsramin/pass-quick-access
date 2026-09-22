@@ -30,7 +30,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         detail.textColor = .secondaryLabelColor
         detail.alignment = .center
         detail.lineBreakMode = .byWordWrapping
-        detail.maximumNumberOfLines = 3
+        detail.maximumNumberOfLines = 4
 
         let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancel.keyEquivalent = "\u{1b}"
@@ -85,7 +85,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
             }
         case let .failure(error as AutoFillClient.Failure):
             switch error {
-            case .unavailable: return "Pass Quick Access isn't running, or AutoFill is off in its settings."
+            case let .unavailable(reason): return "Not reachable: \(reason)"
             case .untrustedServer: return "Something else is answering on the channel. Nothing was sent."
             case .transport: return "The app stopped answering partway through."
             case .unsupportedVersion: return "The app and this extension are different versions."

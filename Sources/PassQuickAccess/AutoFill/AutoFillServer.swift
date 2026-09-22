@@ -33,6 +33,11 @@ final class AutoFillServer: @unchecked Sendable {
     private let index: any AutoFillIndexSource
     private let unlockWindow: UnlockWindow
     private let socketPath: String
+    /// Injectable so the routing can be tested over a `socketpair`, where there
+    /// is no signed peer to inspect. The default is the real check, and it is
+    /// the only thing standing between a caller and the vault, so it is never
+    /// weakened in a shipping path.
+    private let verifyPeer: @Sendable (Int32) -> VerifiedPeer
     private var listener: AgentSocketListener?
     /// Bounds how long a connection thread waits for a request that never
     /// arrives. Generous next to a local write, tight next to a stuck peer.
@@ -42,12 +47,14 @@ final class AutoFillServer: @unchecked Sendable {
         client: PassCLIClient,
         index: any AutoFillIndexSource,
         unlockWindow: UnlockWindow,
-        socketPath: String
+        socketPath: String,
+        verifyPeer: @escaping @Sendable (Int32) -> VerifiedPeer = { CodeSignatureCheck.verify(fd: $0) }
     ) {
         self.client = client
         self.index = index
         self.unlockWindow = unlockWindow
         self.socketPath = socketPath
+        self.verifyPeer = verifyPeer
     }
 
     func start() throws {
@@ -63,7 +70,9 @@ final class AutoFillServer: @unchecked Sendable {
 
     // MARK: - One connection
 
-    private func serve(_ fd: Int32) {
+    /// Serves one connection to completion. Internal so a test can drive it over
+    /// a socket pair rather than a listener.
+    func serve(_ fd: Int32) {
         defer { close(fd) }
         UnixSocket.setReadTimeout(Self.requestTimeout, on: fd)
 
@@ -71,7 +80,7 @@ final class AutoFillServer: @unchecked Sendable {
         // that isn't this build's own extension gets a refusal and nothing else,
         // and an unverifiable peer fails closed because CodeSignatureCheck
         // reports no identity rather than guessing.
-        let peer = CodeSignatureCheck.verify(fd: fd)
+        let peer = verifyPeer(fd)
         guard let expected = AutoFillChannel.expectedExtensionIdentity,
               peer.identity == expected else {
             respond(.failure(.denied), to: fd)
@@ -123,8 +132,17 @@ final class AutoFillServer: @unchecked Sendable {
 
     @MainActor
     private func state(authenticated: Bool) -> AutoFillWire.Response.State {
-        if authenticated { unlockWindow.record() }
-        if unlockWindow.isRequired { return .locked }
+        if authenticated {
+            // A Touch ID the extension has just completed answers the lock for
+            // this request whatever the window says. It matters most under
+            // "authenticate every time", where the window never opens at all
+            // and consulting it would refuse a user who has just proved who
+            // they are. Recording it also extends the window when the setting
+            // is a timeout, so the panel doesn't ask again a moment later.
+            unlockWindow.record()
+        } else if unlockWindow.isRequired {
+            return .locked
+        }
         if index.autofillIsSignedOut { return .signedOut }
         return index.autofillIsIndexReady ? .ready : .indexing
     }

@@ -10,8 +10,11 @@ import Foundation
 /// what actually protects the user from a wedged app.
 enum AutoFillClient {
     enum Failure: Error, Equatable {
-        /// No socket, or nothing listening: the app isn't running.
-        case unavailable
+        /// No socket, or nothing listening: the app isn't running. The reason
+        /// rides along because the three ways this happens (no team on the
+        /// signature, no reachable container, nothing accepting) look identical
+        /// from the outside and need telling apart.
+        case unavailable(String)
         /// Something is listening, but it isn't the app. Nothing is sent.
         case untrustedServer
         case transport
@@ -27,8 +30,18 @@ enum AutoFillClient {
         _ request: AutoFillWire.Request,
         timeout: TimeInterval = defaultTimeout
     ) throws -> AutoFillWire.Response {
-        guard let path = AutoFillChannel.socketPath else { throw Failure.unavailable }
-        guard let fd = try? UnixSocket.connect(to: path) else { throw Failure.unavailable }
+        guard let team = AutoFillChannel.teamIdentifier else {
+            throw Failure.unavailable("this build carries no team identifier")
+        }
+        guard let path = AutoFillChannel.socketPath else {
+            throw Failure.unavailable("no container for group \(team).pqa")
+        }
+        let fd: Int32
+        do {
+            fd = try UnixSocket.connect(to: path)
+        } catch let failure as UnixSocket.Failure {
+            throw Failure.unavailable("\(failure) at \(path)")
+        }
         defer { close(fd) }
 
         // Check who answered before saying anything. A record identifier is not a

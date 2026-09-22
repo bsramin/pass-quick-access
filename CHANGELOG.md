@@ -1,5 +1,48 @@
 # Changelog
 
+## v2026-09-23.1
+
+### Added
+- **System AutoFill.** macOS, Safari and native apps can now ask Pass Quick
+  Access for a password or a one-time code, the way they ask iCloud Passwords.
+  Pick it from the key icon in a login field and your Proton Pass logins are
+  there. This is a different thing from the app typing into the window you came
+  from: the system asks for the credential and fills the field itself, so it
+  needs no Accessibility access, makes no guess about which field you meant, and
+  works in native apps and not only in browsers. Off until you turn it on, under
+  Settings → Autofill → System, and again in System Settings → General →
+  AutoFill & Passwords. Chrome, Firefox and the rest don't use the system
+  provider; there the hotkey panel types as it always did.
+- Optionally, **your logins named in that menu**. For a row to carry your
+  username before you have picked this app, macOS needs a list of them: turning
+  this on saves each login's website and username, and an opaque reference to
+  the item, into the password database macOS manages. Never a password, never a
+  one-time code, never anything else from the item. Off by default, with its own
+  switch, because it is the only thing in the app that writes outside its own
+  memory; turning it off removes what was written. Without it AutoFill still
+  works, you just pick Pass Quick Access and search.
+- **Open at login**, under Settings → General. A menu-bar app that isn't running
+  answers no hotkey, signs no SSH key and has no AutoFill to offer, and until
+  now the app never offered to start itself. When a fill does find it closed,
+  the extension asks macOS to start it and tries again.
+
+### Changed
+- The panel and AutoFill share one unlock window, so unlocking to copy a
+  password doesn't mean being asked again a moment later to fill one.
+- A session that lapsed while the Mac sat idle is now repaired for a fill the
+  same way it already was for a copy, from the stored access token, without
+  sending you to the app to do it by hand.
+
+### Known issues
+- On macOS 27.0, some sign-in forms crash Safari when a password manager fills
+  them. This is a defect in Safari's own form filling, not in any extension: it
+  reproduces with 1Password too, and nothing a credential provider sends can
+  prevent it. Reported to Apple.
+- Passkeys are not offered. Providing one means holding the credential's private
+  key and signing the WebAuthn challenge, and `pass-cli` exposes neither the key
+  nor any signing operation, so the app stays out of the passkey picker rather
+  than appearing there and failing.
+
 ## v2026-09-01.1
 
 ### Fixed

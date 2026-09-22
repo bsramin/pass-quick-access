@@ -220,22 +220,22 @@ footer{padding:50px 0 38px}
 @media(min-width:820px){.ssh-grid{grid-template-columns:.92fr 1.08fr}}
 .ssh-shot{max-width:400px;margin:0 auto}
 .ssh-shot img{display:block;width:100%;height:auto}
-.ssh-steps{list-style:none;margin:0;padding:0;counter-reset:s}
-.ssh-steps li{position:relative;padding:0 0 16px 42px;color:var(--ink-soft);font-size:16px;line-height:1.5}
-.ssh-steps li:last-child{padding-bottom:0}
-.ssh-steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:-1px;
+.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.steps li{position:relative;padding:0 0 16px 42px;color:var(--ink-soft);font-size:16px;line-height:1.5}
+.steps li:last-child{padding-bottom:0}
+.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:-1px;
   width:27px;height:27px;border-radius:50%;background:var(--accent);color:#fff;font-family:"JetBrains Mono",monospace;
   font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
-.ssh-steps li b{color:var(--ink);font-weight:600}
-.ssh-steps .mono{font-size:.92em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
+.steps li b{color:var(--ink);font-weight:600}
+.steps .mono{font-size:.92em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
 .ssh-migrate{margin-top:22px;border:1px solid var(--line-2);border-radius:12px;background:var(--panel);padding:18px 20px}
 .ssh-migrate h3{font-size:16px;font-weight:700;display:flex;align-items:center;gap:9px}
 .ssh-migrate h3 svg{color:var(--accent);flex:none}
 .ssh-migrate p{color:var(--ink-soft);font-size:14.5px;margin:9px 0 0}
 .ssh-migrate .mono{font-size:.9em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
-.ssh-aside{margin-top:18px;color:var(--ink-dim);font-size:13.5px;line-height:1.55}
-.ssh-aside b{color:var(--ink-soft);font-weight:600}
-.ssh-aside .mono{font-size:.9em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
+.aside{margin-top:18px;color:var(--ink-dim);font-size:13.5px;line-height:1.55}
+.aside b{color:var(--ink-soft);font-weight:600}
+.aside .mono{font-size:.9em;background:rgba(0,0,0,.04);padding:1px 5px;border-radius:4px}
 
 /* ---- also by the author ---- */
 .also{
@@ -432,23 +432,23 @@ footer{padding:50px 0 38px}
     <div class="sec-head reveal">
       <div class="sec-num">03 System AutoFill</div>
       <h2>Let macOS do the asking.</h2>
-      <p>Pass Quick Access can answer the password menu built into macOS, the one Safari and native apps already show. Pick it from the key icon in a login field and your Proton Pass logins are right there. Proton Pass itself doesn&rsquo;t offer this on the Mac, so until now the only way to get your logins into that menu was to keep them somewhere else.</p>
+      <p>Pass Quick Access can answer the password menu built into macOS, the one Safari and native apps already show. The app holds the login, macOS puts it in the field. Proton Pass doesn&rsquo;t offer this on the Mac, so until now the only way to get your logins into that menu was to keep them somewhere else.</p>
     </div>
     <div class="grid grid-feat reveal">
       <div class="card span2">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h11"/><path d="m11 8 4 4-4 4"/><circle cx="19" cy="12" r="2.5"/></svg></div>
-        <h3>The system hands it over, nothing is typed</h3>
-        <p>Filling used to mean synthesising keystrokes into whatever had focus, which needs Accessibility access and a guess about which field you meant. Here macOS asks the app for the credential and puts it in the field itself. No keystrokes, no guessing, and it works in native apps, not only in browsers.</p>
+        <h3>Nothing is typed any more</h3>
+        <p>Filling used to mean synthesising keystrokes into whatever had focus, which needs Accessibility access and a guess about which field you meant. Here the system asks for the credential and fills the field itself. No keystrokes, no guessing, no Accessibility permission, and it reaches native apps and not only browsers.</p>
       </div>
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
         <h3>Still read just in time</h3>
-        <p>The bundled extension is sandboxed and reads nothing itself. It asks the app, and only the app ever runs <span class="mono">pass-cli</span>, so a password is fetched at the moment you pick it and the CLI keeps the single session it needs. Both ends check the other&rsquo;s code signature first.</p>
+        <p>The bundled extension is sandboxed and reads nothing itself. It asks the app, and only the app ever runs <span class="mono">pass-cli</span>, so a password is fetched at the moment you pick it. Both ends check the other&rsquo;s code signature before a word is exchanged.</p>
       </div>
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
         <h3>One-time codes too</h3>
-        <p>On macOS 15 and later the system asks for verification codes the same way, and the extension answers those as well. Passkeys it doesn&rsquo;t: providing one means holding the private key and signing the challenge, and <span class="mono">pass-cli</span> exposes neither.</p>
+        <p>On macOS 15 and later the system asks for verification codes the same way, and the extension answers those as well. Not passkeys: providing one means holding the private key and signing the challenge, and <span class="mono">pass-cli</span> exposes neither, so the app stays out of that menu rather than failing in it.</p>
       </div>
       <div class="card span2">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
@@ -456,7 +456,19 @@ footer{padding:50px 0 38px}
         <p>For a row to carry your username before you&rsquo;ve picked this app, macOS needs a list of them. That&rsquo;s off by default and has its own switch, because it is the one thing in the app that writes outside its own memory: turning it on saves each login&rsquo;s website and username, never a password or a code, into the password database macOS manages. Off, AutoFill still works; you pick Pass Quick Access and search.</p>
       </div>
     </div>
-    <p class="ssh-aside reveal"><b>Heads up on macOS 27.0:</b> some sign-in forms crash Safari when a password manager fills them, 1Password included. It is a defect in Safari&rsquo;s own form filling, not in any extension, and it has been reported to Apple. Nothing a credential provider sends can prevent it.</p>
+    <div class="ssh-grid reveal" style="grid-template-columns:1fr">
+      <div>
+        <ol class="steps">
+          <li>Turn on <b>Answer macOS AutoFill</b> in Settings &rarr; Autofill &rarr; System.</li>
+          <li>In <b>System Settings &rarr; General &rarr; AutoFill &amp; Passwords</b>, turn <b>Pass Quick Access</b> on under &ldquo;AutoFill from&rdquo;. Turn Apple&rsquo;s own <b>Passwords</b> off there too if you&rsquo;d rather not be offered both.</li>
+          <li>Click the key icon in any password field and pick Pass Quick Access. Your logins for that site come first, the rest of the vault below.</li>
+        </ol>
+        <p class="aside"><b>Where it works:</b> Safari and native apps. Chrome, Firefox and the other browsers don&rsquo;t use the system provider, so there you still summon the panel with the hotkey and let the app type, exactly as before. The two live side by side; turning one on takes nothing away from the other.</p>
+        <p class="aside"><b>Two Touch ID prompts?</b> macOS has its own <span class="mono">Use Touch ID for autofilling passwords</span> under Touch ID &amp; Password, on by default, and it asks in addition to this app&rsquo;s optional lock. Turn off whichever of the two you&rsquo;d rather not answer; both are yours to set.</p>
+        <p class="aside"><b>To turn it off</b> use System Settings &rarr; General &rarr; AutoFill &amp; Passwords, not the app. macOS owns that switch and gives no way to flip it from the inside.</p>
+        <p class="aside"><b>Heads up on macOS 27.0:</b> some sign-in forms crash Safari when a password manager fills them, 1Password included. It is a defect in Safari&rsquo;s own form filling rather than in any extension, it has been reported to Apple, and nothing a credential provider sends can prevent it.</p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -470,12 +482,12 @@ footer{padding:50px 0 38px}
     <div class="ssh-grid reveal">
       <figure class="ssh-shot"><img src="screenshots/ssh-agent.png" alt="SSH key signature request with a Touch ID prompt" loading="lazy"></figure>
       <div>
-        <ol class="ssh-steps">
+        <ol class="steps">
           <li>Turn on <b>Enable SSH agent</b> in Settings → SSH. The app starts the upstream <span class="mono">pass-cli</span> agent for you.</li>
           <li>Click <b>Configure ~/.ssh/config automatically</b>, it adds <span class="mono">IdentityAgent ~/.ssh/pass-quick-access-agent.sock</span>.</li>
           <li>Use <span class="mono">git</span> and <span class="mono">ssh</span> as usual. Each signature pops a Touch ID prompt; approve once and you're through.</li>
         </ol>
-        <p class="ssh-aside"><b>Tip:</b> the config entry covers <span class="mono">ssh</span> and <span class="mono">git</span>. For tools that read the <span class="mono">SSH_AUTH_SOCK</span> environment variable instead of <span class="mono">~/.ssh/config</span> (like <span class="mono">ssh-add</span> or some GUI clients), also turn on <b>Set SSH_AUTH_SOCK for new programs</b>, it publishes the proxy to your login session for programs launched afterwards.</p>
+        <p class="aside"><b>Tip:</b> the config entry covers <span class="mono">ssh</span> and <span class="mono">git</span>. For tools that read the <span class="mono">SSH_AUTH_SOCK</span> environment variable instead of <span class="mono">~/.ssh/config</span> (like <span class="mono">ssh-add</span> or some GUI clients), also turn on <b>Set SSH_AUTH_SOCK for new programs</b>, it publishes the proxy to your login session for programs launched afterwards.</p>
         <div class="ssh-migrate">
           <h3>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>

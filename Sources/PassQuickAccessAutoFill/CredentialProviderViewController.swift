@@ -181,11 +181,19 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     private func deliver(_ secret: String, account: String, kind: AutoFillWire.Request.Kind) {
         if kind == .oneTimeCode, #available(macOS 15.0, *) {
             extensionContext.completeOneTimeCodeRequest(using: ASOneTimeCodeCredential(code: secret))
-        } else {
-            extensionContext.completeRequest(
-                withSelectedCredential: ASPasswordCredential(user: account, password: secret)
-            )
+            return
         }
+        // Belt as well as braces: the app already leaves out logins with no
+        // username, because Safari turns an empty user into nil and aborts
+        // building the dictionary it fills from, taking the browser with it.
+        // Cancelling costs this one fill; getting it wrong costs every tab.
+        guard !account.isEmpty, !secret.isEmpty else {
+            cancel(.credentialIdentityNotFound)
+            return
+        }
+        extensionContext.completeRequest(
+            withSelectedCredential: ASPasswordCredential(user: account, password: secret)
+        )
     }
 
     private func cancel(_ code: ASExtensionError.Code) {

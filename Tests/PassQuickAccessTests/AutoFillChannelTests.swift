@@ -162,6 +162,27 @@ final class AutoFillServerTests: XCTestCase {
         XCTAssertEqual(index.restoreAttempts, 1)
     }
 
+    func testALoginWithNoUsernameIsNotOfferedForAPasswordFill() async throws {
+        // Safari turns an empty user into nil and then builds an NSDictionary
+        // from it, which aborts the browser. Such an item could not fill a
+        // username field anyway, so it is left out rather than offered.
+        let index = FakeIndex(items: [
+            summary(id: "s1/i1", title: "Named", hasTOTP: true),
+            summary(id: "s1/i2", title: "Nameless", hasTOTP: true, username: nil),
+        ])
+
+        guard case let .matches(passwords) = try await exchange(
+            .matches(services: [], kind: .password), index: index
+        ).body else { return XCTFail("expected matches") }
+        XCTAssertEqual(passwords.map(\.title), ["Named"])
+
+        // A one-time code carries no user, so the same item is fine there.
+        guard case let .matches(codes) = try await exchange(
+            .matches(services: [], kind: .oneTimeCode), index: index
+        ).body else { return XCTFail("expected matches") }
+        XCTAssertEqual(codes.map(\.title), ["Named", "Nameless"])
+    }
+
     func testAnUnknownRecordIdentifierIsNotFoundAndNeverReachesTheCLI() async throws {
         let runner = ArgumentRecordingRunner()
         let response = try await exchange(.password(recordIdentifier: "made/up"), runner: runner)
@@ -285,14 +306,19 @@ final class AutoFillServerTests: XCTestCase {
         return value
     }
 
-    private func summary(id: String, title: String, hasTOTP: Bool) -> ItemSummary {
+    private func summary(
+        id: String,
+        title: String,
+        hasTOTP: Bool,
+        username: String? = "octocat"
+    ) -> ItemSummary {
         let parts = id.split(separator: "/")
         return ItemSummary(
             itemID: String(parts[1]),
             shareID: String(parts[0]),
             vaultName: "Personal",
             title: title,
-            username: "octocat",
+            username: username,
             urls: ["https://github.com"],
             hasPassword: true,
             hasTOTP: hasTOTP

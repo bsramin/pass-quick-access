@@ -187,9 +187,16 @@ final class AutoFillServer: @unchecked Sendable {
         let rest = hosts.isEmpty
             ? []
             : index.autofillItems(matchingHosts: []).filter { !matchedIDs.contains($0.id) }
+        // A password fill needs something to call the user by. Offering a login
+        // without one is not merely untidy: handed an empty user, Safari turns
+        // it into nil and builds an NSDictionary out of it, which aborts the
+        // whole browser. That is Safari's bug and it has been reported, but a
+        // credential provider that can crash its host is our problem too, and
+        // such an item could never fill a username field anyway. A one-time
+        // code carries no user, so it is unaffected.
         let usable: (ItemSummary) -> Bool = kind == .oneTimeCode
             ? { $0.hasTOTP }
-            : { $0.hasPassword }
+            : { $0.hasPassword && $0.account != nil }
         return .matches(
             matched.filter(usable).map { Self.candidate($0, matchesSite: true) }
                 + rest.filter(usable).map { Self.candidate($0, matchesSite: false) }

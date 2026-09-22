@@ -12,12 +12,37 @@ credit if you would like it.
 The app stores no secrets and holds no Proton credentials. It drives the
 official `pass-cli`, keeps only non-secret metadata in memory for searching, and
 reads passwords and one-time codes from the CLI just-in-time when you copy them.
-Nothing is written to disk by the app.
+Nothing is written to disk by the app, with one exception you have to turn on
+yourself, described under *System AutoFill* below.
 
 The trust boundary is the `pass-cli` session: anyone able to run code as your
 user can read your vault through the CLI directly, so the app's goal is to never
 be a weaker link than the CLI already is. The optional Touch ID lock guards
 casual access to an unlocked Mac, not local code execution.
+
+### System AutoFill
+
+The bundled credential-provider extension lets macOS, Safari and other apps ask
+this app for a password or a one-time code. It is sandboxed, as macOS requires
+of a credential provider, and it reads nothing itself: it asks the app over a
+Unix socket in the app's App Group container, and both ends verify the other's
+code signature, same team and expected bundle identifier, before anything is
+exchanged. Only the app ever runs `pass-cli`, so the single-session rule the CLI
+depends on is unchanged. Nothing on that socket can steer the CLI: an item
+reference is resolved through the in-memory index, never taken from the wire.
+
+"Name your logins in the menu", under Settings → Autofill → System, is the
+exception to *nothing is written to disk*. Off by default. Turning it on saves
+each login's **website, username and an opaque item reference** into the
+password database macOS manages, so the native menu can name your logins before
+you have picked this app. It never saves a password, a one-time code, a note or
+anything else from the item. Turning it off removes what was written, as does
+losing the session or turning the provider off.
+
+Passkeys are deliberately not offered. Providing one means signing the WebAuthn
+challenge with the credential's private key, and `pass-cli` exposes neither the
+key nor any signing operation, so claiming the capability would put the app in
+the passkey picker only to fail every assertion.
 
 Released builds are signed with a Developer ID certificate and notarized by
 Apple. They run under the hardened runtime with `get-task-allow` left out, so

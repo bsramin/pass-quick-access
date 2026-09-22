@@ -408,6 +408,7 @@ final class QuickAccessViewModel: ObservableObject {
         lastIndexedAt = Date()
         index = SearchIndex(items: accumulated, usage: usage.snapshot)
         usage.prune(keeping: Set(accumulated.map(\.id)))
+        publishAutoFillSuggestions(accumulated)
         guard contextListActive, let contextHost else {
             refilterPreservingSelection()
             return
@@ -439,6 +440,7 @@ final class QuickAccessViewModel: ObservableObject {
             loadingDetail = nil
             lastIndexedAt = Date()
             usage.prune(keeping: Set(accumulated.map(\.id)))
+            publishAutoFillSuggestions(accumulated)
             refilterPreservingSelection()
             applyContextSelection()
             return .complete
@@ -459,6 +461,9 @@ final class QuickAccessViewModel: ObservableObject {
     /// Switches to a full-window status state, clearing any list or detail left
     /// over from before the failure so the panel resizes and drops the footer.
     private func enterFailure(_ message: String) {
+        // The suggestion list names items in a vault that can no longer be
+        // reached, so it goes with the index rather than outliving it.
+        AutoFillSuggestions.clear()
         loadState = .failed(message)
         loadingDetail = nil
         index = SearchIndex(items: [])
@@ -896,6 +901,14 @@ extension QuickAccessViewModel: AutoFillIndexSource {
 
     func autofillItem(recordIdentifier: String) -> ItemSummary? {
         index.allItems.first { $0.id == recordIdentifier }
+    }
+
+    /// Hands the freshly read index to the system's suggestion list, when the
+    /// user has asked for one. Ranked by use where that is turned on, so the
+    /// menu offers the same order the panel does.
+    private func publishAutoFillSuggestions(_ items: [ItemSummary]) {
+        let ranks = prioritizeUsage ? usage.snapshot : [:]
+        AutoFillSuggestions.publish(items) { ranks[$0] ?? 0 }
     }
 
     /// The same silent reconnect the panel uses, so a session that lapsed while

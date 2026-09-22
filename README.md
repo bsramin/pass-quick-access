@@ -165,14 +165,16 @@ The workflow is the same one you already know:
   titles, URLs, usernames and the presence of a password or one-time code, never
   the secret values. Passwords and codes are read fresh from `pass-cli` at the
   moment you copy them, handed to the pasteboard, and the pasteboard entry is
-  marked concealed and cleared after 30 seconds.
+  marked concealed and cleared after 30 seconds. System AutoFill's optional
+  suggestion list stores a website, a username and an item reference, never a
+  secret, and is off until you turn it on (see [SECURITY.md](SECURITY.md)).
 - **Authentication lives in `pass-cli`.** The app holds no Proton credentials and
   relies on the CLI's existing session.
 - **The trust boundary is that session.** Anyone who can run code as your user
   can already read everything through `pass-cli` directly, so the app is careful
-  not to be a weaker link: nothing is written to disk, and signed release builds
-  use the hardened runtime without `get-task-allow` so other processes can't
-  attach.
+  not to be a weaker link: nothing is written to disk unless you turn on the
+  AutoFill suggestion list, and signed release builds use the hardened runtime
+  without `get-task-allow` so other processes can't attach.
 - An optional Touch ID lock guards casual access to an unlocked Mac. It is not a
   defense against local code execution.
 

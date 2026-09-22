@@ -41,6 +41,11 @@ enum SettingKey {
     /// app's logins in the native password menu. Off means the socket the
     /// extension looks for is never created, and the extension says as much.
     static let autofillProviderEnabled = "autofillProviderEnabled"
+    /// Opt-in: save each login's site and username into the password database
+    /// macOS manages, so the native menu can name them before the extension is
+    /// asked for anything. The only thing in the app that writes outside its own
+    /// memory, hence its own switch and its own paragraph in SECURITY.md.
+    static let autofillSuggestionList = "autofillSuggestionList"
     /// Optional vault name the upstream agent is limited to serving keys from.
     static let sshVaultFilter = "sshVaultFilter"
     /// Advanced override for the upstream `pass-cli` agent socket path; empty uses

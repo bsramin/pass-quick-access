@@ -123,13 +123,14 @@ struct GeneralSettings: View {
 /// tabs since it covers three distinct blocks.
 struct AutofillSettings: View {
     enum Block: String, CaseIterable, Identifiable {
-        case action, filling, browser
+        case action, filling, browser, system
         var id: String { rawValue }
         var title: String {
             switch self {
             case .action: return "Action"
             case .filling: return "Filling"
             case .browser: return "Browser Match"
+            case .system: return "System"
             }
         }
     }
@@ -139,6 +140,8 @@ struct AutofillSettings: View {
     @AppStorage(SettingKey.matchActiveTab) private var matchActiveTab = true
     @AppStorage(SettingKey.firefoxAccessibility) private var firefoxAccessibility = false
     @AppStorage(SettingKey.webAppMatching) private var webAppMatching = false
+    @AppStorage(SettingKey.autofillProviderEnabled) private var providerEnabled = false
+    @AppStorage(SettingKey.autofillSuggestionList) private var suggestionList = false
     @State private var block: Block = .action
     @State private var accessibilityTrusted = AutoTyper.isProcessTrusted
 
@@ -150,6 +153,7 @@ struct AutofillSettings: View {
                 case .action: action
                 case .filling: filling
                 case .browser: browser
+                case .system: system
                 }
             }
             .formStyle(.grouped)
@@ -169,7 +173,39 @@ struct AutofillSettings: View {
 
     /// Filling has nothing to show in copy-only mode, so it drops out.
     private var blocks: [Block] {
-        actionMode == ActionMode.copyOnly.rawValue ? [.action, .browser] : Block.allCases
+        actionMode == ActionMode.copyOnly.rawValue ? [.action, .browser, .system] : Block.allCases
+    }
+
+    /// System AutoFill: letting macOS itself ask this app for a password, which
+    /// is a different thing from the app typing one into the window you came
+    /// from, and carries a different trade, so it lives in its own block.
+    @ViewBuilder
+    private var system: some View {
+        Section {
+            Toggle("Answer macOS AutoFill", isOn: $providerEnabled)
+            Button("Open System Settings…") {
+                guard let url = URL(string: "x-apple.systempreferences:com.apple.preferences.password") else { return }
+                NSWorkspace.shared.open(url)
+            }
+            .buttonStyle(.link)
+        } footer: {
+            Text("Lets Safari and other apps ask Pass Quick Access for a password or a one-time code, the way they ask iCloud Passwords. Also turn Pass Quick Access on under AutoFill & Passwords in System Settings. Secrets are still read from pass-cli only when you pick an item.")
+        }
+        Section {
+            Toggle("Name your logins in the menu", isOn: $suggestionList)
+                .disabled(!providerEnabled)
+        } footer: {
+            Text("Off by default. To show an item's name before you pick this app, macOS needs a list of them: this saves each login's website and username, and a reference to the item, into the password database macOS manages on disk. Never a password and never a one-time code. Turning it off deletes the list again; with it off AutoFill still works, you just pick Pass Quick Access and search.")
+        }
+        .onChange(of: suggestionList) { _, isOn in
+            if !isOn { AutoFillSuggestions.clear() }
+        }
+        .onChange(of: providerEnabled) { _, isOn in
+            if !isOn {
+                suggestionList = false
+                AutoFillSuggestions.clear()
+            }
+        }
     }
 
     @ViewBuilder

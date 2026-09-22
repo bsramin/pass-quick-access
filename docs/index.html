@@ -306,6 +306,7 @@ footer{padding:50px 0 38px}
     <a class="brand" href="#top"><img src="icon.png" alt="">Pass Quick Access</a>
     <div class="nav-links">
       <a class="txt" href="#features">Features</a>
+      <a class="txt" href="#autofill">AutoFill</a>
       <a class="txt" href="#ssh">SSH agent</a>
       <a class="txt" href="#security">Security</a>
       <a class="txt" href="#how">How it works</a>
@@ -373,7 +374,7 @@ footer{padding:50px 0 38px}
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7.5 14h9"/></svg></div>
         <h3>Fill or copy</h3>
-        <p>Type the login straight into the app you came from, in any browser, or copy the username, password or one-time code. Each shown only when the item has it; choose fill, copy, or both.</p>
+        <p>Type the login straight into the app you came from, in any browser, or copy the username, password or one-time code. Each shown only when the item has it; choose fill, copy, or both. Or let macOS ask the app instead, through <a href="#autofill">System AutoFill</a>.</p>
       </div>
       <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M6.5 6.5h.01M9.5 6.5h.01"/></svg></div>
@@ -426,10 +427,43 @@ footer{padding:50px 0 38px}
   </div>
 </section>
 
+<section id="autofill">
+  <div class="wrap sec-pad">
+    <div class="sec-head reveal">
+      <div class="sec-num">03 System AutoFill</div>
+      <h2>Let macOS do the asking.</h2>
+      <p>Pass Quick Access can answer the password menu built into macOS, the one Safari and native apps already show. Pick it from the key icon in a login field and your Proton Pass logins are right there. Proton Pass itself doesn&rsquo;t offer this on the Mac, so until now the only way to get your logins into that menu was to keep them somewhere else.</p>
+    </div>
+    <div class="grid grid-feat reveal">
+      <div class="card span2">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h11"/><path d="m11 8 4 4-4 4"/><circle cx="19" cy="12" r="2.5"/></svg></div>
+        <h3>The system hands it over, nothing is typed</h3>
+        <p>Filling used to mean synthesising keystrokes into whatever had focus, which needs Accessibility access and a guess about which field you meant. Here macOS asks the app for the credential and puts it in the field itself. No keystrokes, no guessing, and it works in native apps, not only in browsers.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+        <h3>Still read just in time</h3>
+        <p>The bundled extension is sandboxed and reads nothing itself. It asks the app, and only the app ever runs <span class="mono">pass-cli</span>, so a password is fetched at the moment you pick it and the CLI keeps the single session it needs. Both ends check the other&rsquo;s code signature first.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
+        <h3>One-time codes too</h3>
+        <p>On macOS 15 and later the system asks for verification codes the same way, and the extension answers those as well. Passkeys it doesn&rsquo;t: providing one means holding the private key and signing the challenge, and <span class="mono">pass-cli</span> exposes neither.</p>
+      </div>
+      <div class="card span2">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+        <h3>Your logins named in the menu, if you ask</h3>
+        <p>For a row to carry your username before you&rsquo;ve picked this app, macOS needs a list of them. That&rsquo;s off by default and has its own switch, because it is the one thing in the app that writes outside its own memory: turning it on saves each login&rsquo;s website and username, never a password or a code, into the password database macOS manages. Off, AutoFill still works; you pick Pass Quick Access and search.</p>
+      </div>
+    </div>
+    <p class="ssh-aside reveal"><b>Heads up on macOS 27.0:</b> some sign-in forms crash Safari when a password manager fills them, 1Password included. It is a defect in Safari&rsquo;s own form filling, not in any extension, and it has been reported to Apple. Nothing a credential provider sends can prevent it.</p>
+  </div>
+</section>
+
 <section id="ssh">
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">03 SSH agent</div>
+      <div class="sec-num">04 SSH agent</div>
       <h2>Your SSH keys, gated by Touch ID.</h2>
       <p>Just like 1Password's SSH agent: it serves the SSH keys you keep in Proton Pass to <span class="mono">git</span> and <span class="mono">ssh</span>, and asks for Touch ID before every signature, naming the app that's asking. The private keys never leave pass-cli; the app only adds the native confirmation.</p>
     </div>
@@ -457,7 +491,7 @@ footer{padding:50px 0 38px}
 <section id="how">
   <div class="wrap sec-pad">
     <div class="sec-head reveal" style="margin-left:auto;margin-right:auto;text-align:center;max-width:52rem">
-      <div class="sec-num">04 How it works</div>
+      <div class="sec-num">05 How it works</div>
       <h2>A thin, native shell over the official CLI.</h2>
     </div>
     <div class="flow reveal">
@@ -482,7 +516,7 @@ footer{padding:50px 0 38px}
 <section>
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">05 Screenshots</div>
+      <div class="sec-num">06 Screenshots</div>
       <h2>Native, down to the pixel.</h2>
     </div>
     <div class="shots reveal">
@@ -495,7 +529,7 @@ footer{padding:50px 0 38px}
 <section id="get">
   <div class="wrap sec-pad">
     <div class="sec-head reveal">
-      <div class="sec-num">06 Get it</div>
+      <div class="sec-num">07 Get it</div>
       <h2>Get it running.</h2>
     </div>
     <div class="get-grid">

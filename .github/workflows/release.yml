@@ -79,6 +79,39 @@ jobs:
           security list-keychain -d user -s "$keychain" login.keychain-db
           rm -f "$RUNNER_TEMP/certificate.p12"
 
+      # The AutoFill credential provider needs entitlements Apple allowlists per
+      # App ID, so the app and the extension each embed a Developer ID profile.
+      # These are not secrets in the cryptographic sense, but they carry the
+      # signing certificate, so they travel the same way the p12 does and the
+      # decoded copies go no further than the runner's temp directory.
+      - name: Install the provisioning profiles
+        env:
+          PROFILE_APP: ${{ secrets.MACOS_PROVISIONING_PROFILE_APP }}
+          PROFILE_AUTOFILL: ${{ secrets.MACOS_PROVISIONING_PROFILE_AUTOFILL }}
+        run: |
+          if [[ -z "$PROFILE_APP" || -z "$PROFILE_AUTOFILL" ]]; then
+            echo "The provisioning profile secrets are not set; without them the" >&2
+            echo "build would ship silently without AutoFill." >&2
+            exit 1
+          fi
+          # Xcode looks the profile up by UUID or by name, and reads it from this
+          # directory; the older ~/Library/MobileDevice path is gone from recent
+          # Xcodes, so only this one is written.
+          dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$dir"
+          for pair in "PQA_APP_PROFILE:$PROFILE_APP" "PQA_AUTOFILL_PROFILE:$PROFILE_AUTOFILL"; do
+            name="${pair%%:*}"
+            profile="$RUNNER_TEMP/$name.provisionprofile"
+            printf '%s' "${pair#*:}" | base64 --decode > "$profile"
+            # The build names the profile by UUID, so read it back out of the
+            # profile itself rather than carrying it as one more secret to keep
+            # in step with the file.
+            uuid="$(security cms -D -i "$profile" | plutil -extract UUID raw -o - -)"
+            cp "$profile" "$dir/$uuid.provisionprofile"
+            echo "$name=$uuid" >> "$GITHUB_ENV"
+            rm -f "$profile"
+          done
+
       - name: Build, sign and notarize
         env:
           PQA_BUILD_VERSION: ${{ steps.version.outputs.build }}

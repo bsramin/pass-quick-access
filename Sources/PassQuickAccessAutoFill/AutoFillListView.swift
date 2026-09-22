@@ -20,7 +20,14 @@ struct AutoFillListView: View {
         VStack(spacing: 0) {
             switch model.phase {
             case .loading:
-                centered { ProgressView().controlSize(.small) }
+                centered {
+                    VStack(spacing: 10) {
+                        ProgressView().controlSize(.small)
+                        if let note = model.note {
+                            Text(note).font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                    }
+                }
             case .list:
                 search
                 Divider()

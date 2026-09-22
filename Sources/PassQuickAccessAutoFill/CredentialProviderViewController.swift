@@ -33,9 +33,29 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         preferredContentSize = Self.contentSize
     }
 
+    /// Last line of defence. If the host put the sheet on screen without
+    /// calling any of the prepare methods, something is still better than a
+    /// blank rectangle: show everything and let the user search.
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        guard hosted == nil else { return }
+        present([], kind: .password)
+    }
+
     // MARK: - Choosing from a list
 
     override func prepareCredentialList(for serviceIdentifiers: [ASCredentialServiceIdentifier]) {
+        present(serviceIdentifiers, kind: .password)
+    }
+
+    /// The variant the system prefers when a request could involve passkeys.
+    /// Overridden even though this provider offers none: if only the older one
+    /// exists, the system calls neither and the sheet comes up empty.
+    @available(macOS 14.0, *)
+    override func prepareCredentialList(
+        for serviceIdentifiers: [ASCredentialServiceIdentifier],
+        requestParameters: ASPasskeyCredentialRequestParameters
+    ) {
         present(serviceIdentifiers, kind: .password)
     }
 

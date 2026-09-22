@@ -22,6 +22,10 @@ final class AutoFillListModel: ObservableObject {
 
     @Published var query = ""
     @Published private(set) var phase: Phase = .loading
+    /// Shown under the spinner. The wait that needs explaining is the first
+    /// index after an unlock, which reads every vault and is nobody's idea of
+    /// instant.
+    @Published private(set) var note: String?
     @Published private(set) var candidates: [AutoFillWire.Response.Candidate] = []
 
     /// What the user typed, matched against what a row shows. The app already
@@ -49,11 +53,36 @@ final class AutoFillListModel: ObservableObject {
 
     func load() {
         phase = .loading
-        Task {
-            let response = await Self.send(.matches(services: services, kind: kind), authenticated: authenticated)
-            apply(response)
+        note = nil
+        Task { await loadWaitingForTheIndex() }
+    }
+
+    /// Asks for the matches, and keeps asking while the app says it is still
+    /// reading vaults. The app answers that immediately rather than holding the
+    /// connection, because one pass-cli run per vault outlasts any deadline
+    /// worth putting on a socket.
+    private func loadWaitingForTheIndex() async {
+        let deadline = Date().addingTimeInterval(Self.indexWait)
+        while true {
+            let result = await Self.send(.matches(services: services, kind: kind), authenticated: authenticated)
+            guard case let .success(response) = result,
+                  case .failure(.indexNotReady) = response.body else {
+                apply(result)
+                return
+            }
+            guard Date() < deadline else {
+                phase = .message("Pass Quick Access is still reading your vaults. Try again in a moment.")
+                return
+            }
+            note = "Reading your vaults…"
+            try? await Task.sleep(for: .milliseconds(700))
         }
     }
+
+    /// How long to keep waiting on a first index. Long, because the wait is
+    /// real work and the alternative is telling the user something is wrong
+    /// when nothing is.
+    private static let indexWait: TimeInterval = 60
 
     /// Runs the system's own authentication, then asks again. The prompt belongs
     /// here rather than in the app: raised from the extension it appears over
@@ -74,18 +103,24 @@ final class AutoFillListModel: ObservableObject {
     /// reason on screen.
     func secret(for candidate: AutoFillWire.Response.Candidate) async -> String? {
         phase = .loading
+        note = nil
         let body: AutoFillWire.Request.Body = kind == .oneTimeCode
             ? .oneTimeCode(recordIdentifier: candidate.recordIdentifier)
             : .password(recordIdentifier: candidate.recordIdentifier)
-        let response = await Self.send(body, authenticated: authenticated)
-        if case let .secret(value) = response?.body { return value }
-        apply(response)
+        let result = await Self.send(body, authenticated: authenticated)
+        if case let .success(response) = result, case let .secret(value) = response.body { return value }
+        apply(result)
         return nil
     }
 
-    private func apply(_ response: AutoFillWire.Response?) {
-        guard let response else {
-            phase = .message(Self.notRunningMessage)
+    private func apply(_ result: Result<AutoFillWire.Response, Error>) {
+        note = nil
+        let response: AutoFillWire.Response
+        switch result {
+        case let .success(value):
+            response = value
+        case let .failure(error):
+            phase = .message(Self.describe(error))
             return
         }
         switch response.body {
@@ -123,14 +158,31 @@ final class AutoFillListModel: ObservableObject {
     private static let notRunningMessage =
         "Pass Quick Access isn't running, or AutoFill is off in its settings."
 
+    /// Telling these apart matters. An app that is there but busy is not an app
+    /// that isn't running, and saying so sends the user off to fix the wrong
+    /// thing.
+    private static func describe(_ error: Error) -> String {
+        switch error as? AutoFillClient.Failure {
+        case .unavailable:
+            return notRunningMessage
+        case .transport:
+            return "Pass Quick Access stopped answering. Try again."
+        case .untrustedServer, .unsupportedVersion:
+            return "This extension and Pass Quick Access don't match. Reopen the app."
+        case nil:
+            return "AutoFill couldn't reach Pass Quick Access."
+        }
+    }
+
     private static func send(
         _ body: AutoFillWire.Request.Body,
         authenticated: Bool
-    ) async -> AutoFillWire.Response? {
+    ) async -> Result<AutoFillWire.Response, Error> {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let response = try? AutoFillClient.send(.init(body, authenticated: authenticated))
-                continuation.resume(returning: response)
+                continuation.resume(returning: Result {
+                    try AutoFillClient.send(.init(body, authenticated: authenticated))
+                })
             }
         }
     }

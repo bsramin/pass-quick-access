@@ -157,10 +157,14 @@ final class AutoFillServer: @unchecked Sendable {
         case .locked: return .failure(.locked)
         case .signedOut: return .failure(.signedOut)
         case .indexing:
-            // First thing to ask after a launch is quite likely to be this, so
-            // read the vaults rather than reporting an empty list.
-            await index.autofillLoadIndexIfNeeded()
-            guard index.autofillIsIndexReady else { return .failure(.indexNotReady) }
+            // Start the read, but answer now. Reading every vault is one
+            // pass-cli run per vault and can outlast any deadline worth giving
+            // a socket, so holding the connection open turns a slow first load
+            // into a severed one. The extension polls while it shows a spinner.
+            // loadIfNeeded is a no-op while a pass is already running, so a
+            // caller that asks repeatedly does not stack them.
+            Task { await index.autofillLoadIndexIfNeeded() }
+            return .failure(.indexNotReady)
         case .ready:
             break
         }

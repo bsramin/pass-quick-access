@@ -31,7 +31,11 @@ struct AutoFillListView: View {
                 centered { message(text) }
             }
         }
-        .frame(width: 380, height: 300)
+        // Fills whatever the host gives it rather than insisting on a size.
+        // The controller asks for one through preferredContentSize, which the
+        // host may honour or ignore, and a fixed frame in here would leave a
+        // margin of dead space when it ignores it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var search: some View {

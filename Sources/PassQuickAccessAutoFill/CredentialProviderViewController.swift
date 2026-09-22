@@ -19,6 +19,20 @@ import SwiftUI
 final class CredentialProviderViewController: ASCredentialProviderViewController {
     private var hosted: NSView?
 
+    /// The size the sheet asks the host for. The host is free to ignore it, but
+    /// without it the view starts at zero and the list has nowhere to draw.
+    private static let contentSize = NSSize(width: 380, height: 300)
+
+    /// Required, and easy to leave out. AppKit's NSViewController does not
+    /// invent an empty view the way UIKit does: with no nib and no override it
+    /// raises when anything first touches `view`, which for an app extension
+    /// means the sheet vanishes the moment it is asked to appear, with no crash
+    /// report to explain it.
+    override func loadView() {
+        view = NSView(frame: NSRect(origin: .zero, size: Self.contentSize))
+        preferredContentSize = Self.contentSize
+    }
+
     // MARK: - Choosing from a list
 
     override func prepareCredentialList(for serviceIdentifiers: [ASCredentialServiceIdentifier]) {

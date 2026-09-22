@@ -18,6 +18,12 @@ import SwiftUI
 /// `pass-cli` exposes neither the key nor any signing operation.
 final class CredentialProviderViewController: ASCredentialProviderViewController {
     private var hosted: NSView?
+    /// A request may be completed once. Two answers to one request leave the
+    /// host holding a context it has already finished with, and a browser that
+    /// then tries to fill from it is in nobody's tested path. Two taps in the
+    /// list, or a slow silent read landing after the system has moved on, are
+    /// both ordinary ways to get there.
+    private var isFinished = false
 
     /// The size the sheet asks the host for. The host is free to ignore it, but
     /// without it the view starts at zero and the list has nowhere to draw.
@@ -106,15 +112,25 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         let kind = Self.kind(of: credentialRequest)
         let account = credentialRequest.credentialIdentity.user
         Task { @MainActor in
-            // One attempt, no retry: someone waiting on a menu is better served
-            // by our own sheet appearing than by a pause they cannot read.
-            guard let secret = await Self.read(identifier, kind: kind, authenticated: false) else {
+            // Deliberately impatient. The system expects this to be answered or
+            // declined at once, and an answer arriving twelve seconds late may
+            // arrive after it has given up and asked again through the
+            // interface path, leaving two answers to one request. A read the
+            // app can serve from a warm index takes milliseconds; anything
+            // slower belongs on the other path, where it can be seen.
+            let secret = await Self.read(
+                identifier, kind: kind, authenticated: false, timeout: Self.silentTimeout
+            )
+            guard let secret else {
                 self.cancel(.userInteractionRequired)
                 return
             }
             self.deliver(secret, account: account, kind: kind)
         }
     }
+
+    /// How long the silent path waits before handing over to the visible one.
+    private static let silentTimeout: TimeInterval = 2
 
     /// The follow-up, once the system has decided the user must be involved.
     /// Here the lock can be answered and a failure can be explained.
@@ -159,14 +175,17 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     private static func read(
         _ recordIdentifier: String,
         kind: AutoFillWire.Request.Kind,
-        authenticated: Bool
+        authenticated: Bool,
+        timeout: TimeInterval = AutoFillClient.defaultTimeout
     ) async -> String? {
         let body: AutoFillWire.Request.Body = kind == .oneTimeCode
             ? .oneTimeCode(recordIdentifier: recordIdentifier)
             : .password(recordIdentifier: recordIdentifier)
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let response = try? AutoFillClient.send(.init(body, authenticated: authenticated))
+                let response = try? AutoFillClient.send(
+                    .init(body, authenticated: authenticated), timeout: timeout
+                )
                 guard case let .secret(value) = response?.body else {
                     continuation.resume(returning: nil)
                     return
@@ -179,6 +198,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     /// Hands the value to whoever asked. The plaintext lives for exactly as long
     /// as this call and is never written down by the extension.
     private func deliver(_ secret: String, account: String, kind: AutoFillWire.Request.Kind) {
+        guard !isFinished else { return }
+        isFinished = true
         if kind == .oneTimeCode, #available(macOS 15.0, *) {
             extensionContext.completeOneTimeCodeRequest(using: ASOneTimeCodeCredential(code: secret))
             return
@@ -188,6 +209,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         // building the dictionary it fills from, taking the browser with it.
         // Cancelling costs this one fill; getting it wrong costs every tab.
         guard !account.isEmpty, !secret.isEmpty else {
+            isFinished = false
             cancel(.credentialIdentityNotFound)
             return
         }
@@ -197,6 +219,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     }
 
     private func cancel(_ code: ASExtensionError.Code) {
+        guard !isFinished else { return }
+        isFinished = true
         extensionContext.cancelRequest(withError: ASExtensionError(code))
     }
 

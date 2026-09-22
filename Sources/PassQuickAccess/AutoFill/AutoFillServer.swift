@@ -15,8 +15,8 @@ protocol AutoFillIndexSource: AnyObject {
     /// Reads the vaults if that hasn't happened yet. The extension may well be
     /// the first thing to ask for anything after a launch.
     func autofillLoadIndexIfNeeded() async
-    /// Items whose stored URLs match any of these hosts, or everything when the
-    /// list is empty.
+    /// Items whose stored URLs match any of these hosts, already normalised, or
+    /// everything when the list is empty.
     func autofillItems(matchingHosts hosts: [String]) -> [ItemSummary]
     /// The item a record identifier names, or nil when it names nothing.
     func autofillItem(recordIdentifier: String) -> ItemSummary?
@@ -111,8 +111,8 @@ final class AutoFillServer: @unchecked Sendable {
         switch request.body {
         case .status:
             return .status(waitFor { await self.state(authenticated: request.authenticated) })
-        case let .matches(hosts, kind):
-            return waitFor { await self.matches(hosts: hosts, kind: kind, request: request) }
+        case let .matches(services, kind):
+            return waitFor { await self.matches(services: services, kind: kind, request: request) }
         case let .password(recordIdentifier):
             return waitFor {
                 await self.secret(recordIdentifier: recordIdentifier, request: request) { reference in
@@ -149,7 +149,7 @@ final class AutoFillServer: @unchecked Sendable {
 
     @MainActor
     private func matches(
-        hosts: [String],
+        services: [String],
         kind: AutoFillWire.Request.Kind,
         request: AutoFillWire.Request
     ) async -> AutoFillWire.Response.Body {
@@ -165,6 +165,9 @@ final class AutoFillServer: @unchecked Sendable {
             break
         }
 
+        // A service identifier is a bare domain or a full URL depending on who
+        // is asking; WebHost copes with both and drops a leading "www.".
+        let hosts = services.compactMap(WebHost.from)
         let items = index.autofillItems(matchingHosts: hosts)
         let wanted = kind == .oneTimeCode ? items.filter(\.hasTOTP) : items.filter(\.hasPassword)
         return .matches(wanted.map(Self.candidate))

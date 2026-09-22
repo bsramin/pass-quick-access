@@ -2,9 +2,10 @@
 
 import AppKit
 import AuthenticationServices
+import SwiftUI
 
 /// The credential provider macOS loads when an app or Safari asks for a
-/// password.
+/// password or a one-time code.
 ///
 /// It reads nothing itself. The extension is sandboxed, as the system requires
 /// of a credential provider, so it cannot run `pass-cli`; it asks the app over
@@ -12,93 +13,180 @@ import AuthenticationServices
 /// workaround: `pass-cli` keeps one session on disk and rotates its refresh
 /// token on use, so a second process reading vaults would sign the user out.
 ///
-/// Filling is not wired up yet. What works today is the channel, and this
-/// reports what it finds down it.
+/// Passkeys are not offered, here or in the Info.plist. Providing one means
+/// signing the WebAuthn challenge with the credential's private key, and
+/// `pass-cli` exposes neither the key nor any signing operation.
 final class CredentialProviderViewController: ASCredentialProviderViewController {
-    private let heading = NSTextField(labelWithString: "Pass Quick Access")
-    private let detail = NSTextField(labelWithString: "Checking…")
+    private var hosted: NSView?
 
-    override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 150))
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        heading.font = .systemFont(ofSize: 15, weight: .semibold)
-        detail.font = .systemFont(ofSize: 12)
-        detail.textColor = .secondaryLabelColor
-        detail.alignment = .center
-        detail.lineBreakMode = .byWordWrapping
-        detail.maximumNumberOfLines = 4
-
-        let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancel))
-        cancel.keyEquivalent = "\u{1b}"
-
-        let stack = NSStackView(views: [heading, detail, cancel])
-        stack.orientation = .vertical
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -32),
-        ])
-    }
-
-    override func viewWillAppear() {
-        super.viewWillAppear()
-        checkChannel()
-    }
+    // MARK: - Choosing from a list
 
     override func prepareCredentialList(for serviceIdentifiers: [ASCredentialServiceIdentifier]) {
-        checkChannel()
+        present(serviceIdentifiers, kind: .password)
+    }
+
+    @available(macOS 15.0, *)
+    override func prepareOneTimeCodeCredentialList(for serviceIdentifiers: [ASCredentialServiceIdentifier]) {
+        present(serviceIdentifiers, kind: .oneTimeCode)
     }
 
     override func prepareInterfaceForExtensionConfiguration() {
-        checkChannel()
+        // Nothing to configure here: what AutoFill may do is decided in the
+        // app's own settings, where the rest of its switches already live.
+        present(configurationNotice: "AutoFill is set up in Pass Quick Access, under Settings.")
     }
 
-    /// Asks the app how it is. Off the main thread because the client blocks:
-    /// the app may be reading a vault, or not running at all, and neither is a
-    /// reason to freeze the sheet the user is looking at.
-    private func checkChannel() {
-        detail.stringValue = "Checking…"
-        DispatchQueue.global(qos: .userInitiated).async {
-            let message = Self.describe(Result { try AutoFillClient.send(.init(.status)) })
-            DispatchQueue.main.async { self.detail.stringValue = message }
+    private func present(_ services: [ASCredentialServiceIdentifier], kind: AutoFillWire.Request.Kind) {
+        let model = AutoFillListModel(services: services.map(\.identifier), kind: kind)
+        install(NSHostingView(rootView: AutoFillListView(
+            model: model,
+            onPick: { [weak self] candidate in self?.complete(with: candidate, from: model, kind: kind) },
+            onCancel: { [weak self] in self?.cancel(.userCanceled) }
+        )))
+        model.load()
+    }
+
+    private func complete(
+        with candidate: AutoFillWire.Response.Candidate,
+        from model: AutoFillListModel,
+        kind: AutoFillWire.Request.Kind
+    ) {
+        Task { @MainActor in
+            // A nil means the model has already put the reason on screen.
+            guard let secret = await model.secret(for: candidate) else { return }
+            deliver(secret, account: candidate.account ?? "", kind: kind)
         }
     }
 
-    private static func describe(_ result: Result<AutoFillWire.Response, Error>) -> String {
-        switch result {
-        case let .success(response):
-            guard case let .status(state) = response.body else {
-                return "The app answered something unexpected."
+    // MARK: - Filling a credential the system already knows about
+
+    /// The silent path, taken when the user picks a named suggestion straight
+    /// from the AutoFill menu. Nothing may be shown here, so anything short of
+    /// an immediate answer has to become `userInteractionRequired` and let the
+    /// system come back through the interface path below.
+    override func provideCredentialWithoutUserInteraction(for credentialRequest: any ASCredentialRequest) {
+        guard let identifier = credentialRequest.credentialIdentity.recordIdentifier else {
+            cancel(.credentialIdentityNotFound)
+            return
+        }
+        let kind = Self.kind(of: credentialRequest)
+        let account = credentialRequest.credentialIdentity.user
+        Task { @MainActor in
+            // One attempt, no retry: someone waiting on a menu is better served
+            // by our own sheet appearing than by a pause they cannot read.
+            guard let secret = await Self.read(identifier, kind: kind, authenticated: false) else {
+                self.cancel(.userInteractionRequired)
+                return
             }
-            switch state {
-            case .ready: return "Connected. \(state.rawValue), filling isn't wired up yet."
-            case .indexing: return "Connected, still reading your vaults."
-            case .locked: return "Connected. Unlock Pass Quick Access first."
-            case .signedOut: return "Connected, but signed out of Proton Pass."
-            }
-        case let .failure(error as AutoFillClient.Failure):
-            switch error {
-            case let .unavailable(reason): return "Not reachable: \(reason)"
-            case .untrustedServer: return "Something else is answering on the channel. Nothing was sent."
-            case .transport: return "The app stopped answering partway through."
-            case .unsupportedVersion: return "The app and this extension are different versions."
-            }
-        case .failure:
-            return "The channel could not be opened."
+            self.deliver(secret, account: account, kind: kind)
         }
     }
 
-    /// The host's own Cancel is not guaranteed to be on screen, so the sheet
-    /// carries one: a provider that cannot serve a credential must still leave
-    /// the user a way out.
-    @objc private func cancel() {
-        extensionContext.cancelRequest(withError: ASExtensionError(.userCanceled))
+    /// The follow-up, once the system has decided the user must be involved.
+    /// Here the lock can be answered and a failure can be explained.
+    override func prepareInterfaceToProvideCredential(for credentialRequest: any ASCredentialRequest) {
+        guard let identifier = credentialRequest.credentialIdentity.recordIdentifier else {
+            cancel(.credentialIdentityNotFound)
+            return
+        }
+        let identity = credentialRequest.credentialIdentity
+        let kind = Self.kind(of: credentialRequest)
+        let model = AutoFillListModel(services: [identity.serviceIdentifier.identifier], kind: kind)
+        install(NSHostingView(rootView: AutoFillListView(
+            model: model,
+            onPick: { [weak self] candidate in self?.complete(with: candidate, from: model, kind: kind) },
+            onCancel: { [weak self] in self?.cancel(.userCanceled) }
+        )))
+
+        // The system already knows which item this is, so go straight for it.
+        // Anything in the way (the lock, a slow read, a vanished item) surfaces
+        // in the same view, which is why it is installed first.
+        complete(
+            with: AutoFillWire.Response.Candidate(
+                recordIdentifier: identifier,
+                title: identity.serviceIdentifier.identifier,
+                account: identity.user,
+                vaultName: nil,
+                hasOneTimeCode: kind == .oneTimeCode
+            ),
+            from: model,
+            kind: kind
+        )
+    }
+
+    // MARK: - Plumbing
+
+    private static func kind(of request: any ASCredentialRequest) -> AutoFillWire.Request.Kind {
+        if #available(macOS 15.0, *), request.type == .oneTimeCode { return .oneTimeCode }
+        return .password
+    }
+
+    private static func read(
+        _ recordIdentifier: String,
+        kind: AutoFillWire.Request.Kind,
+        authenticated: Bool
+    ) async -> String? {
+        let body: AutoFillWire.Request.Body = kind == .oneTimeCode
+            ? .oneTimeCode(recordIdentifier: recordIdentifier)
+            : .password(recordIdentifier: recordIdentifier)
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let response = try? AutoFillClient.send(.init(body, authenticated: authenticated))
+                guard case let .secret(value) = response?.body else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: value)
+            }
+        }
+    }
+
+    /// Hands the value to whoever asked. The plaintext lives for exactly as long
+    /// as this call and is never written down by the extension.
+    private func deliver(_ secret: String, account: String, kind: AutoFillWire.Request.Kind) {
+        if kind == .oneTimeCode, #available(macOS 15.0, *) {
+            extensionContext.completeOneTimeCodeRequest(using: ASOneTimeCodeCredential(code: secret))
+        } else {
+            extensionContext.completeRequest(
+                withSelectedCredential: ASPasswordCredential(user: account, password: secret)
+            )
+        }
+    }
+
+    private func cancel(_ code: ASExtensionError.Code) {
+        extensionContext.cancelRequest(withError: ASExtensionError(code))
+    }
+
+    private func present(configurationNotice text: String) {
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.alignment = .center
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        let done = NSButton(title: "Done", target: self, action: #selector(finishConfiguration))
+        done.keyEquivalent = "\r"
+        let stack = NSStackView(views: [label, done])
+        stack.orientation = .vertical
+        stack.spacing = 12
+        stack.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+        install(stack)
+    }
+
+    @objc private func finishConfiguration() {
+        extensionContext.completeExtensionConfigurationRequest()
+    }
+
+    /// Replaces whatever is on screen. The system reuses one controller across
+    /// the paths above, so leaving the previous view in place would stack them.
+    private func install(_ view: NSView) {
+        hosted?.removeFromSuperview()
+        hosted = view
+        view.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            view.topAnchor.constraint(equalTo: self.view.topAnchor),
+            view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+        ])
     }
 }

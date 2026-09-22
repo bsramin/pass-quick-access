@@ -42,8 +42,12 @@ enum AutoFillWire {
         enum Body: Codable, Sendable {
             /// Is the app there, is it unlocked, does it have an index yet.
             case status
-            /// Logins for these hosts, or every login when the list is empty.
-            case matches(hosts: [String], kind: Kind)
+            /// Logins for these services, or every login when the list is
+            /// empty. The values are the service identifiers exactly as macOS
+            /// gave them, a bare domain or a whole URL; reducing them to hosts
+            /// is the app's job, so the matching rules live next to the index
+            /// they are matched against rather than in two places.
+            case matches(services: [String], kind: Kind)
             case password(recordIdentifier: String)
             case oneTimeCode(recordIdentifier: String)
         }

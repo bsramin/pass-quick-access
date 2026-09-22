@@ -9,8 +9,8 @@ final class AutoFillWireTests: XCTestCase {
     func testEveryMessageSurvivesTheRoundTrip() throws {
         let requests: [AutoFillWire.Request.Body] = [
             .status,
-            .matches(hosts: [], kind: .password),
-            .matches(hosts: ["example.com", "login.example.com"], kind: .oneTimeCode),
+            .matches(services: [], kind: .password),
+            .matches(services: ["example.com", "https://login.example.com/in"], kind: .oneTimeCode),
             .password(recordIdentifier: "share/item"),
             .oneTimeCode(recordIdentifier: "share/item"),
         ]
@@ -129,12 +129,12 @@ final class AutoFillServerTests: XCTestCase {
         ])
 
         guard case let .matches(all) = try await exchange(
-            .matches(hosts: [], kind: .password), index: index
+            .matches(services: [], kind: .password), index: index
         ).body else { return XCTFail("expected matches") }
         XCTAssertEqual(all.map(\.title), ["With code", "Password only"])
 
         guard case let .matches(codes) = try await exchange(
-            .matches(hosts: [], kind: .oneTimeCode), index: index
+            .matches(services: [], kind: .oneTimeCode), index: index
         ).body else { return XCTFail("expected matches") }
         XCTAssertEqual(codes.map(\.title), ["With code"])
         XCTAssertTrue(codes.allSatisfy(\.hasOneTimeCode))

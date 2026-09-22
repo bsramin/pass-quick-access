@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The entitlements of the signed build, selected by the same
+	     PQA_ENTITLEMENTS_SUFFIX switch the app uses. Every key below except the
+	     sandbox has to be allowlisted by the "PQA AutoFill Developer ID"
+	     provisioning profile, which is embedded into this bundle at build time;
+	     the two must agree or the signature is rejected.
+
+	     Signing is manual, so unlike an automatically signed build these are not
+	     filled in for us: the identifiers are written out literally. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Lets the system offer this extension when an app or Safari asks for a
+	     password or a one-time code. The app carries it too: macOS requires it
+	     on both halves. -->
+	<key>com.apple.developer.authentication-services.autofill-credential-provider</key>
+	<true/>
+	<key>com.apple.application-identifier</key>
+	<string>Y3T76BW4DZ.it.ramin.PassQuickAccess.AutoFill</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>Y3T76BW4DZ</string>
+	<!-- The shared container the extension and the app meet in. The team-prefixed
+	     form is the macOS one, and it is kept short on purpose: the socket that
+	     will live there has to fit in sun_path's 104 bytes, and every character
+	     of the group name comes out of the budget a user's home directory needs.
+	     The profile allows any Y3T76BW4DZ.* group, so this name is covered
+	     without registering it by hand. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>Y3T76BW4DZ.pqa</string>
+	</array>
+</dict>
+</plist>

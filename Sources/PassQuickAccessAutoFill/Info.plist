@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Pass Quick Access</string>
+	<!-- An app extension is loaded by the system as an XPC service, not launched
+	     as an application, so the package type differs from the app's APPL. -->
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Released under the GNU General Public License v3.0.</string>
+	<!-- The extension runs in its own process, so the unlock prompt it raises is
+	     its own and needs its own usage description. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlock Pass Quick Access with Touch ID.</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.authentication-services-credential-provider-ui</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).CredentialProviderViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- What the system may ask this provider for. Passkeys are absent on
+			     purpose: providing one means signing the WebAuthn challenge with
+			     the credential's private key, and pass-cli exposes neither the key
+			     nor any signing operation. Claiming the capability would put us in
+			     the picker and then fail every assertion. -->
+			<key>ASCredentialProviderExtensionCapabilities</key>
+			<dict>
+				<key>ProvidesPasswords</key>
+				<true/>
+				<key>ProvidesOneTimeCodes</key>
+				<true/>
+			</dict>
+			<key>ASCredentialProviderExtensionShowsConfigurationUI</key>
+			<true/>
+		</dict>
+	</dict>
+</dict>
+</plist>

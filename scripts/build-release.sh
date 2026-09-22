@@ -11,6 +11,15 @@
 #                       "Developer ID Application: Jane Doe (ABCDE12345)"
 #   PQA_TEAM_ID         the team that identity belongs to
 #
+# The AutoFill credential provider needs entitlements Apple allowlists per App
+# ID, so app and extension each embed a Developer ID provisioning profile. Name
+# them by UUID or by profile name; they must already be installed in
+# ~/Library/Developer/Xcode/UserData/Provisioning Profiles. Leave both unset to
+# build without AutoFill, which is what an unsigned build gets anyway.
+#
+#   PQA_APP_PROFILE        profile for it.ramin.PassQuickAccess
+#   PQA_AUTOFILL_PROFILE   profile for it.ramin.PassQuickAccess.AutoFill
+#
 # Notarization is attempted only for a signed build, with either a profile saved
 # by `notarytool store-credentials`:
 #
@@ -56,6 +65,16 @@ if [[ -n "${PQA_SIGN_IDENTITY:-}" ]]; then
     )
     if [[ -n "${PQA_TEAM_ID:-}" ]]; then
         build_settings+=("DEVELOPMENT_TEAM=${PQA_TEAM_ID}")
+    fi
+    # Fed to the targets through their own variables, not as a bare
+    # PROVISIONING_PROFILE_SPECIFIER, for the reason the entitlements comment
+    # above gives: a command-line setting reaches every target, and the SPM
+    # packages would then hunt for a profile matching a bundle id of their own.
+    if [[ -n "${PQA_APP_PROFILE:-}" ]]; then
+        build_settings+=(
+            "PQA_APP_PROFILE=${PQA_APP_PROFILE}"
+            "PQA_AUTOFILL_PROFILE=${PQA_AUTOFILL_PROFILE:?set alongside PQA_APP_PROFILE}"
+        )
     fi
 fi
 
@@ -145,6 +164,27 @@ if [[ -n "${PQA_SIGN_IDENTITY:-}" ]]; then
     done < <(find "$app" -type f -perm -u+x -exec sh -c 'file -b "$1" | grep -q Mach-O' _ {} \; -print)
 
     echo "All executables signed by team ${expected_team} with a secure timestamp."
+fi
+
+# A bundle that lost its provisioning profile, or that was signed without the
+# AutoFill entitlement, builds and notarizes perfectly happily. The only symptom
+# is that macOS never offers the credential provider, which is a slow and
+# thoroughly confusing thing to discover after a release. Fail here instead.
+if [[ -n "${PQA_APP_PROFILE:-}" ]]; then
+    autofill_key="com.apple.developer.authentication-services.autofill-credential-provider"
+    for bundle in "$app" "$app/Contents/PlugIns/PassQuickAccessAutoFill.appex"; do
+        if [[ ! -f "$bundle/Contents/embedded.provisionprofile" ]]; then
+            echo "error: no embedded provisioning profile: ${bundle#"$(dirname "$app")/"}" >&2
+            exit 1
+        fi
+        entitlements="$(codesign -d --entitlements - --xml "$bundle" 2> /dev/null || true)"
+        if [[ "$entitlements" != *"$autofill_key"* ]]; then
+            echo "error: signed without the AutoFill entitlement: ${bundle#"$(dirname "$app")/"}" >&2
+            exit 1
+        fi
+    done
+
+    echo "App and extension carry their profiles and the AutoFill entitlement."
 fi
 
 ditto -c -k --keepParent "$app" "$zip"

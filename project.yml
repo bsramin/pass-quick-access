@@ -33,6 +33,13 @@ targets:
     dependencies:
       - package: KeyboardShortcuts
       - package: Sparkle
+      # Rides along in Contents/PlugIns, which is where macOS looks for an app's
+      # extensions. Spelled out rather than left to xcodegen's default so a
+      # change in that default can't silently move it somewhere unusable.
+      - target: PassQuickAccessAutoFill
+        embed: true
+        copy:
+          destination: plugins
     # Signing lives in Config/Signing.xcconfig (ad-hoc by default), which pulls
     # in a git-ignored Config/Local.xcconfig if you want to sign with your own
     # identity.
@@ -50,6 +57,13 @@ targets:
         # every target including the SPM packages, which would then look for the
         # file inside their own checkout and fail the build.
         CODE_SIGN_ENTITLEMENTS: Sources/PassQuickAccess/App/PassQuickAccess$(PQA_ENTITLEMENTS_SUFFIX).entitlements
+        # The AutoFill entitlement is allowlisted by a provisioning profile, so
+        # a signed build needs one embedded. Named through a variable for the
+        # same reason as the entitlements above: a PROVISIONING_PROFILE_SPECIFIER
+        # on the xcodebuild command line would reach the SPM package targets,
+        # which would then look for a profile for a bundle id they don't own.
+        # Empty everywhere else, which is what an unsigned build wants.
+        PROVISIONING_PROFILE_SPECIFIER: $(PQA_APP_PROFILE)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The app launches a subprocess (pass-cli), which the App Sandbox
         # forbids, so it is unsandboxed.
@@ -63,6 +77,32 @@ targets:
           ENABLE_HARDENED_RUNTIME: YES
           # Keep get-task-allow out of signed Release builds, so the hardened
           # runtime actually prevents another process from attaching.
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+
+  # The credential provider macOS loads when an app asks for a password. Unlike
+  # the app it *is* sandboxed, because the system refuses to load an extension
+  # that isn't; that is also why it can't run pass-cli and has to ask the app.
+  PassQuickAccessAutoFill:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Sources/PassQuickAccessAutoFill
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.ramin.PassQuickAccess.AutoFill
+        INFOPLIST_FILE: Sources/PassQuickAccessAutoFill/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/PassQuickAccessAutoFill/PassQuickAccessAutoFill$(PQA_ENTITLEMENTS_SUFFIX).entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(PQA_AUTOFILL_PROFILE)
+        ENABLE_APP_SANDBOX: YES
+        SKIP_INSTALL: YES
+      configs:
+        Debug:
+          ENABLE_HARDENED_RUNTIME: NO
+        Release:
+          ENABLE_HARDENED_RUNTIME: YES
           CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
   PassQuickAccessTests:

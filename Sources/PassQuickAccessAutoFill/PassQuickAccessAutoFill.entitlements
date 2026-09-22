@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Development and ad-hoc builds. The AutoFill entitlement, the app group
+	     and the application identifier are all deliberately absent: each of them
+	     has to be allowlisted by a provisioning profile, and a build signed
+	     ad-hoc or with a Development certificate has none. Claiming one anyway
+	     doesn't degrade the extension, it makes AMFI refuse to launch it.
+
+	     So the extension in a from-source build is inert: it is present in the
+	     bundle and it compiles, but the system will not offer it as a credential
+	     provider. Only the signed build from scripts/build-release.sh, which
+	     picks PassQuickAccessAutoFill-Distribution.entitlements, is a real one. -->
+	<!-- Required of every app extension, and of a credential provider in
+	     particular: the system will not load one that isn't sandboxed. This is
+	     also why the extension can't read a secret itself, since the sandbox
+	     forbids spawning pass-cli; it asks the app instead. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+</dict>
+</plist>

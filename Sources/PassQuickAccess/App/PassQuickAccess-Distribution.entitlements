@@ -16,5 +16,27 @@
 	     not send Apple events at all without this. -->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
+	<!-- Everything below is allowlisted by the "PQA Developer ID" provisioning
+	     profile embedded in this bundle, and is absent from the development
+	     entitlements because an ad-hoc or Development signature cannot carry it.
+	     A from-source build therefore behaves exactly as it did before AutoFill
+	     existed, minus the AutoFill. -->
+	<!-- Required on the app as well as on the extension: macOS wants both halves
+	     of a credential provider to carry it. It is also what lets the app write
+	     the optional suggestion list into the system's credential identity
+	     store. -->
+	<key>com.apple.developer.authentication-services.autofill-credential-provider</key>
+	<true/>
+	<key>com.apple.application-identifier</key>
+	<string>Y3T76BW4DZ.it.ramin.PassQuickAccess</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>Y3T76BW4DZ</string>
+	<!-- The shared container the app and the sandboxed extension meet in. Must
+	     be the same literal string on both sides or they get separate
+	     directories and never find each other. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>Y3T76BW4DZ.pqa</string>
+	</array>
 </dict>
 </plist>

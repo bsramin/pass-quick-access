@@ -217,6 +217,10 @@ footer{padding:50px 0 38px}
 
 /* ---- ssh agent ---- */
 .ssh-grid{display:grid;gap:28px;align-items:center}
+.setup{display:grid;gap:28px;margin-top:28px;align-items:start}
+@media(min-width:820px){.setup{grid-template-columns:.95fr 1.05fr;gap:44px}}
+.setup-notes{display:grid;gap:14px}
+.setup-notes .aside{margin-top:0}
 @media(min-width:820px){.ssh-grid{grid-template-columns:.92fr 1.08fr}}
 .ssh-shot{max-width:400px;margin:0 auto}
 .ssh-shot img{display:block;width:100%;height:auto}
@@ -456,13 +460,15 @@ footer{padding:50px 0 38px}
         <p>For a row to carry your username before you&rsquo;ve picked this app, macOS needs a list of them. That&rsquo;s off by default and has its own switch, because it is the one thing in the app that writes outside its own memory: turning it on saves each login&rsquo;s website and username, never a password or a code, into the password database macOS manages. Off, AutoFill still works; you pick Pass Quick Access and search.</p>
       </div>
     </div>
-    <div class="ssh-grid reveal" style="grid-template-columns:1fr">
+    <div class="setup reveal">
       <div>
         <ol class="steps">
           <li>Turn on <b>Answer macOS AutoFill</b> in Settings &rarr; Autofill &rarr; System.</li>
           <li>In <b>System Settings &rarr; General &rarr; AutoFill &amp; Passwords</b>, turn <b>Pass Quick Access</b> on under &ldquo;AutoFill from&rdquo;. Turn Apple&rsquo;s own <b>Passwords</b> off there too if you&rsquo;d rather not be offered both.</li>
           <li>Click the key icon in any password field and pick Pass Quick Access. Your logins for that site come first, the rest of the vault below.</li>
         </ol>
+      </div>
+      <div class="setup-notes">
         <p class="aside"><b>Where it works:</b> Safari and native apps. Chrome, Firefox and the other browsers don&rsquo;t use the system provider, so there you still summon the panel with the hotkey and let the app type, exactly as before. The two live side by side; turning one on takes nothing away from the other.</p>
         <p class="aside"><b>Two Touch ID prompts?</b> macOS has its own <span class="mono">Use Touch ID for autofilling passwords</span> under Touch ID &amp; Password, on by default, and it asks in addition to this app&rsquo;s optional lock. Turn off whichever of the two you&rsquo;d rather not answer; both are yours to set.</p>
         <p class="aside"><b>To turn it off</b> use System Settings &rarr; General &rarr; AutoFill &amp; Passwords, not the app. macOS owns that switch and gives no way to flip it from the inside.</p>

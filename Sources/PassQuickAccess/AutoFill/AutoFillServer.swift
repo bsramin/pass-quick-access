@@ -20,6 +20,9 @@ protocol AutoFillIndexSource: AnyObject {
     func autofillItems(matchingHosts hosts: [String]) -> [ItemSummary]
     /// The item a record identifier names, or nil when it names nothing.
     func autofillItem(recordIdentifier: String) -> ItemSummary?
+    /// Tries to bring a lapsed session back from the stored token, the same way
+    /// the panel does when a command finds it gone. Returns whether it worked.
+    func autofillRestoreSession() async -> Bool
 }
 
 /// Answers the credential provider over the shared container's socket.
@@ -110,7 +113,10 @@ final class AutoFillServer: @unchecked Sendable {
     private func handle(_ request: AutoFillWire.Request) -> AutoFillWire.Response.Body {
         switch request.body {
         case .status:
-            return .status(waitFor { await self.state(authenticated: request.authenticated) })
+            // Through the same resolution as the rest: a status that reports a
+            // lapsed session nobody tried to repair would be a different answer
+            // from every other request, for no reason a caller could guess.
+            return .status(waitFor { await self.resolved(request) })
         case let .matches(services, kind):
             return waitFor { await self.matches(services: services, kind: kind, request: request) }
         case let .password(recordIdentifier):
@@ -153,7 +159,7 @@ final class AutoFillServer: @unchecked Sendable {
         kind: AutoFillWire.Request.Kind,
         request: AutoFillWire.Request
     ) async -> AutoFillWire.Response.Body {
-        switch state(authenticated: request.authenticated) {
+        switch await resolved(request) {
         case .locked: return .failure(.locked)
         case .signedOut: return .failure(.signedOut)
         case .indexing:
@@ -183,7 +189,7 @@ final class AutoFillServer: @unchecked Sendable {
         request: AutoFillWire.Request,
         read: @escaping (ItemReference) async throws -> SensitiveString
     ) async -> AutoFillWire.Response.Body {
-        switch state(authenticated: request.authenticated) {
+        switch await resolved(request) {
         case .locked: return .failure(.locked)
         case .signedOut: return .failure(.signedOut)
         case .indexing, .ready: break
@@ -197,10 +203,28 @@ final class AutoFillServer: @unchecked Sendable {
         } catch let error as PassCLIError where error.isServiceUnreachable {
             return .failure(.timedOut)
         } catch let error as PassCLIError where error.isAuthenticationFailure {
-            return .failure(.signedOut)
+            // The session went while we were using it, which a long idle makes
+            // ordinary. Bring it back and read again rather than asking the
+            // user to go and do it: they are mid-login, and the panel heals the
+            // same lapse without involving them either.
+            guard await index.autofillRestoreSession() else { return .failure(.signedOut) }
+            guard let value = try? await read(item.reference) else { return .failure(.signedOut) }
+            return .secret(value.reveal())
         } catch {
             return .failure(.notFound)
         }
+    }
+
+    /// The state to act on, having first tried to heal a lapsed session. The
+    /// panel restores one from the stored token without a prompt, and there is
+    /// no reason a fill should be told to go and do by hand what a copy repairs
+    /// on its own.
+    @MainActor
+    private func resolved(_ request: AutoFillWire.Request) async -> AutoFillWire.Response.State {
+        let current = state(authenticated: request.authenticated)
+        guard current == .signedOut else { return current }
+        guard await index.autofillRestoreSession() else { return .signedOut }
+        return state(authenticated: request.authenticated)
     }
 
     private static func candidate(_ item: ItemSummary) -> AutoFillWire.Response.Candidate {

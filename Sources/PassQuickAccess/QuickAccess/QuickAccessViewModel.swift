@@ -892,4 +892,11 @@ extension QuickAccessViewModel: AutoFillIndexSource {
     func autofillItem(recordIdentifier: String) -> ItemSummary? {
         index.allItems.first { $0.id == recordIdentifier }
     }
+
+    /// The same silent reconnect the panel uses, so a session that lapsed while
+    /// the Mac sat idle is repaired for a fill exactly as it is for a copy,
+    /// including the index reload and SSH agent recovery that follow it.
+    func autofillRestoreSession() async -> Bool {
+        await onSilentReconnect?() ?? false
+    }
 }

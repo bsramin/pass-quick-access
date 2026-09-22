@@ -140,6 +140,27 @@ final class AutoFillServerTests: XCTestCase {
         XCTAssertTrue(codes.allSatisfy(\.hasOneTimeCode))
     }
 
+    func testALapsedSessionIsRepairedRatherThanReported() async throws {
+        let index = FakeIndex(
+            items: [summary(id: "s1/i1", title: "GitHub", hasTOTP: false)],
+            isSignedOut: true,
+            canRestore: true
+        )
+        let response = try await exchange(.password(recordIdentifier: "s1/i1"), index: index)
+
+        XCTAssertEqual(secret(of: response), "hunter2")
+        XCTAssertEqual(index.restoreAttempts, 1, "the token should be tried before giving up")
+    }
+
+    func testASessionThatCannotBeRepairedIsReportedOnce() async throws {
+        let index = FakeIndex(isSignedOut: true, canRestore: false)
+        let response = try await exchange(.status, index: index)
+
+        guard case let .status(state) = response.body else { return XCTFail("expected a status") }
+        XCTAssertEqual(state, .signedOut)
+        XCTAssertEqual(index.restoreAttempts, 1)
+    }
+
     func testAnUnknownRecordIdentifierIsNotFoundAndNeverReachesTheCLI() async throws {
         let runner = ArgumentRecordingRunner()
         let response = try await exchange(.password(recordIdentifier: "made/up"), runner: runner)
@@ -297,16 +318,32 @@ final class AutoFillServerTests: XCTestCase {
 private final class FakeIndex: AutoFillIndexSource {
     private let items: [ItemSummary]
     private let ready: Bool
+    private var signedOut: Bool
+    private let canRestore: Bool
     private(set) var wasRead = false
+    private(set) var restoreAttempts = 0
 
-    init(items: [ItemSummary] = [], isReady: Bool = true) {
+    init(
+        items: [ItemSummary] = [],
+        isReady: Bool = true,
+        isSignedOut: Bool = false,
+        canRestore: Bool = false
+    ) {
         self.items = items
         self.ready = isReady
+        self.signedOut = isSignedOut
+        self.canRestore = canRestore
     }
 
     var autofillIsIndexReady: Bool { ready }
-    var autofillIsSignedOut: Bool { false }
+    var autofillIsSignedOut: Bool { signedOut }
     func autofillLoadIndexIfNeeded() async {}
+
+    func autofillRestoreSession() async -> Bool {
+        restoreAttempts += 1
+        if canRestore { signedOut = false }
+        return canRestore
+    }
 
     func autofillItems(matchingHosts hosts: [String]) -> [ItemSummary] {
         wasRead = true

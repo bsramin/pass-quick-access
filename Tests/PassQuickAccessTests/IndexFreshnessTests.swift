@@ -42,6 +42,31 @@ final class IndexFreshnessTests: XCTestCase {
         XCTAssertEqual(model.results.count, 2, "the menu's refresh should re-read whatever the index's age")
     }
 
+    func testAutoFillIsServedFromTheIndexWhileARefreshRuns() async {
+        let runner = VaultRunner(titles: ["GitHub"])
+        let model = makeViewModel(runner: runner, freshness: 0)
+        await model.reload()
+        XCTAssertTrue(model.autofillIsIndexReady)
+
+        // A refresh keeps the previous index in place and swaps it at the end,
+        // so a fill during one has a complete answer waiting. Reporting "not
+        // ready" here made every fill after the freshness window sit through a
+        // re-read for something already in memory.
+        async let refresh: Void = model.refreshIfStale()
+        XCTAssertTrue(model.autofillIsIndexReady, "an index being refreshed is still an index")
+        await refresh
+        XCTAssertTrue(model.autofillIsIndexReady)
+    }
+
+    func testAutoFillWaitsForTheFirstPassRatherThanAnsweringFromOneVault() async {
+        let runner = VaultRunner(titles: ["GitHub"])
+        let model = makeViewModel(runner: runner, freshness: 600)
+
+        XCTAssertFalse(model.autofillIsIndexReady, "nothing has been read yet")
+        await model.reload()
+        XCTAssertTrue(model.autofillIsIndexReady)
+    }
+
     func testARefreshThatLosesTheSessionKeepsTheResultsAndReconnects() async {
         let runner = VaultRunner(titles: ["GitHub"])
         let model = makeViewModel(runner: runner, freshness: 0)

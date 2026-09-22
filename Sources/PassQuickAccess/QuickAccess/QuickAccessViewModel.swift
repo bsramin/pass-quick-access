@@ -877,12 +877,19 @@ final class QuickAccessViewModel: ObservableObject {
 /// secret, and the reference handed back for a record identifier is the one from
 /// the index rather than anything a caller supplied.
 extension QuickAccessViewModel: AutoFillIndexSource {
-    /// Ready means every vault, not merely the first. `loadState` turns `.ready`
-    /// as soon as one vault lands so the panel can show it while the rest
-    /// stream in, which is right for a list a user is watching and wrong for a
-    /// question asked once: answering then returns whichever vaults happened to
-    /// have arrived, and the login someone is looking for is quietly missing.
-    var autofillIsIndexReady: Bool { loadState == .ready && !isIndexing }
+    /// Ready means a pass over every vault has finished at some point, not that
+    /// one is finishing now.
+    ///
+    /// Two failures to avoid, pulling opposite ways. `loadState` turns `.ready`
+    /// as soon as the first vault lands, so the panel can show it while the
+    /// rest stream in; answering on that returns whichever vaults happened to
+    /// have arrived and quietly omits the login someone is after. But waiting
+    /// on `isIndexing` is just as wrong once there is an index, because the app
+    /// re-reads the vaults every few minutes to pick up logins added elsewhere,
+    /// and that pass keeps the previous index in place and swaps it at the end.
+    /// Blocking on it made every fill after the first five minutes sit through
+    /// a wait for an answer already in memory.
+    var autofillIsIndexReady: Bool { loadState == .ready && lastIndexedAt != nil }
 
     var autofillIsSignedOut: Bool { isSignedOut }
 

@@ -149,20 +149,100 @@ user picks "Update Now" (see [SECURITY.md](SECURITY.md)).
 release as an upgrade. `MARKETING_VERSION` is still the human version you bump in
 `project.yml`.
 
+## Provisioning profiles (one-time setup)
+
+Most of the app's entitlements are free for the taking: you write them in a file
+and sign. The AutoFill credential provider is not. Apple allowlists
+`com.apple.developer.authentication-services.autofill-credential-provider` per
+App ID, and a build only gets it by embedding a provisioning profile that grants
+it. The app and the extension are separate code identities, so they need one
+each.
+
+In *Certificates, Identifiers & Profiles*:
+
+1. Register an App Group. `Y3T76BW4DZ.pqa` is what the entitlements name; the
+   portal wants a `group.`-prefixed identifier of its own, and a Developer ID
+   profile ends up granting the whole `TEAMID.*` range anyway.
+2. Register two explicit App IDs, `it.ramin.PassQuickAccess` and
+   `it.ramin.PassQuickAccess.AutoFill`, each with **AutoFill Credential
+   Provider** and **App Groups** enabled.
+3. Create a **Developer ID** profile for each, bound to the Developer ID
+   Application certificate. Despite what older forum threads say, the capability
+   is available for Developer ID profiles: this app ships with two.
+
+Check what you got before building, because a profile missing the entitlement
+fails in the least obvious way possible, which is a provider macOS silently
+never offers:
+
+```sh
+security cms -D -i PQA_Developer_ID.provisionprofile \
+  | plutil -extract Entitlements xml1 -o - -
+```
+
+Install both under `~/Library/Developer/Xcode/UserData/Provisioning Profiles`
+and name them to the build by UUID or by profile name:
+
+```sh
+export PQA_APP_PROFILE="d8cdd90e-…" PQA_AUTOFILL_PROFILE="573c29a0-…"
+```
+
+For CI, load them as secrets; the job installs them and derives each UUID from
+the profile itself, so regenerating one means replacing one secret and nothing
+else:
+
+```sh
+base64 -i PQA_Developer_ID.provisionprofile | gh secret set MACOS_PROVISIONING_PROFILE_APP
+base64 -i PQA_AutoFill_Developer_ID.provisionprofile | gh secret set MACOS_PROVISIONING_PROFILE_AUTOFILL
+```
+
+`build-release.sh` asserts after signing that both bundles carry a profile and
+the entitlement, so a mistake here fails locally in seconds rather than after a
+release.
+
+### Building this fork under your own account
+
+Nothing here is secret: a Team ID appears in every signed binary. But it is
+*specific*, so a fork that wants a working AutoFill extension has to substitute
+its own. Three places name `Y3T76BW4DZ` or `it.ramin.…`:
+
+- `project.yml` — `bundleIdPrefix` and the two `PRODUCT_BUNDLE_IDENTIFIER`s.
+- `Sources/PassQuickAccess/App/PassQuickAccess-Distribution.entitlements`
+- `Sources/PassQuickAccessAutoFill/PassQuickAccessAutoFill-Distribution.entitlements`
+
+They are written out rather than composed from `$(AppIdentifierPrefix)` and
+friends because Xcode does not expand build-setting variables in an entitlements
+file under manual signing: the placeholders survive into the signature verbatim,
+and the result is a build that signs, notarizes and then refuses to launch the
+extension.
+
+Only the `-Distribution` files carry any of this. Building from source without a
+Developer ID identity uses the plain entitlements, which name no team and claim
+no provisioned capability, so a contributor needs none of the above — they just
+get an app whose AutoFill extension the system will not offer.
+
 ## Entitlements
 
-There are two entitlement files, and which one is used follows the signing mode:
+There are two entitlement files per target, and which one is used follows the
+signing mode. For the app:
 
 - `PassQuickAccess-Distribution.entitlements` for a Developer ID build, selected
   by `build-release.sh` when `PQA_SIGN_IDENTITY` is set.
 - `PassQuickAccess.entitlements` everywhere else (development, ad-hoc), which
   additionally disables library validation.
 
+The AutoFill extension has the same pair under
+`Sources/PassQuickAccessAutoFill/`, differing the other way round: its
+`-Distribution` file adds the provisioned entitlements, and its plain one claims
+only the sandbox. That asymmetry is deliberate. An ad-hoc or Development
+signature cannot be granted a provisioned entitlement, and an extension that
+claims one anyway is not offered-but-limited, it is killed at launch by AMFI.
+
 The switch is the `PQA_ENTITLEMENTS_SUFFIX` variable, interpolated into
-`CODE_SIGN_ENTITLEMENTS` on the app target in `project.yml`. Overriding the path
+`CODE_SIGN_ENTITLEMENTS` on each target in `project.yml`. Overriding the path
 itself on the `xcodebuild` command line does not work: a command-line setting
 applies to every target, so the SPM packages inherit it and fail the build
-looking for the file inside their own checkout.
+looking for the file inside their own checkout. `PROVISIONING_PROFILE_SPECIFIER`
+is fed through `PQA_APP_PROFILE` and `PQA_AUTOFILL_PROFILE` for the same reason.
 
 The exemption exists because Xcode re-signs the embedded Sparkle.framework with
 the app's own identity: under a Developer ID both carry the same team and library

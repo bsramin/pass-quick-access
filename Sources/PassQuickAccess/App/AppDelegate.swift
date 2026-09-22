@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var controller: QuickAccessController?
     private var agentController: AgentProxyController?
+    private var autofillServer: AutoFillServer?
     private var reconnector: PATReconnector?
     private var settingsWindowController: SettingsWindowController?
     private let updateController = UpdateController()
@@ -39,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.preloadIndexIfUnlocked()
         self.controller = controller
 
+        startAutoFillServer(client: client, controller: controller)
+
         let agent = AgentProxyController(executable: executable, reconnector: reconnector)
         self.agentController = agent
         controller.onSessionRestored = { [weak agent] in await agent?.recover() }
@@ -49,6 +52,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         agentController?.stop()
+        autofillServer?.stop()
+    }
+
+    /// Opens the channel the bundled credential provider talks to. Opt-in, and
+    /// quietly impossible in a build that isn't signed with a team: the socket
+    /// lives in an app-group container that only a provisioned build can reach,
+    /// which is the same reason such a build's extension is never offered.
+    private func startAutoFillServer(client: PassCLIClient, controller: QuickAccessController) {
+        guard UserDefaults.standard.bool(forKey: SettingKey.autofillProviderEnabled) else { return }
+        guard let path = AutoFillChannel.socketPath else { return }
+        let server = AutoFillServer(
+            client: client,
+            index: controller.viewModel,
+            unlockWindow: controller.unlockWindow,
+            socketPath: path
+        )
+        do {
+            try server.start()
+            autofillServer = server
+        } catch {
+            NSLog("AutoFill server could not start: \(error)")
+        }
     }
 
     private func installStatusItem() {

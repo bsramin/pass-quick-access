@@ -11,7 +11,9 @@ import SwiftUI
 /// can be gated behind Touch ID.
 @MainActor
 final class QuickAccessController {
-    private let viewModel: QuickAccessViewModel
+    /// Exposed so the AutoFill server can read the same index the panel shows,
+    /// rather than building and refreshing a second one.
+    let viewModel: QuickAccessViewModel
     private let largeType = LargeTypeWindowController()
     private let autoTyper = AutoTyper()
     private let recovery: SessionRecovery
@@ -23,7 +25,9 @@ final class QuickAccessController {
     private var previousApp: NSRunningApplication?
     private var anchorTopLeft: NSPoint?
     private var cancellable: AnyCancellable?
-    private var lastUnlock: Date?
+    /// Shared with the AutoFill extension's server, so one unlock covers both
+    /// surfaces rather than each keeping its own idea of how recent it was.
+    let unlockWindow: UnlockWindow
     /// The context from the most recent unlock, reused for a no-prompt reconnect
     /// when a command finds the session gone while the panel is open.
     private var lastAuthContext: LAContext?
@@ -37,7 +41,14 @@ final class QuickAccessController {
 
     private let panelWidth: CGFloat = 640
 
-    init(client: PassCLIClient, executable: URL, reconnector: PATReconnector, updateController: UpdateController) {
+    init(
+        client: PassCLIClient,
+        executable: URL,
+        reconnector: PATReconnector,
+        updateController: UpdateController,
+        unlockWindow: UnlockWindow = UnlockWindow()
+    ) {
+        self.unlockWindow = unlockWindow
         self.recovery = SessionRecovery(client: client)
         self.keepalive = SessionKeepalive(client: client)
         self.reconnector = reconnector
@@ -179,7 +190,7 @@ final class QuickAccessController {
         }
         Task {
             guard let auth = await BiometricAuth.authenticatedContext(reason: "unlock Pass Quick Access") else { return }
-            lastUnlock = Date()
+            unlockWindow.record()
             lastAuthContext = auth.context
             present(frontmost: frontmost)
             // Reuse the unlock's Touch ID to restore a dropped session, so the
@@ -216,15 +227,8 @@ final class QuickAccessController {
         return BrowserContext.activeTabURL(of: app).flatMap(WebHost.from)
     }
 
-    /// Whether the panel must authenticate before opening, given the setting and
-    /// how long ago the last successful unlock was.
-    private var requiresUnlock: Bool {
-        let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: SettingKey.requireAuth) else { return false }
-        let timeout = defaults.integer(forKey: SettingKey.authTimeout)
-        guard timeout > 0, let lastUnlock else { return true }
-        return Date().timeIntervalSince(lastUnlock) > Double(timeout)
-    }
+    /// Whether the panel must authenticate before opening.
+    private var requiresUnlock: Bool { unlockWindow.isRequired }
 
     /// Hides the panel. `restoringFocus` reactivates the app that was frontmost
     /// before the panel opened, which is right after a copy or escape but not

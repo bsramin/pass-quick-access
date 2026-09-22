@@ -864,3 +864,32 @@ final class QuickAccessViewModel: ObservableObject {
         }
     }
 }
+
+// MARK: - AutoFill
+
+/// The panel's index, read-only, for the credential provider's server. Every
+/// member is a projection of what the panel already holds; nothing here reads a
+/// secret, and the reference handed back for a record identifier is the one from
+/// the index rather than anything a caller supplied.
+extension QuickAccessViewModel: AutoFillIndexSource {
+    var autofillIsIndexReady: Bool { loadState == .ready }
+
+    var autofillIsSignedOut: Bool { isSignedOut }
+
+    func autofillLoadIndexIfNeeded() async {
+        await loadIfNeeded()
+    }
+
+    func autofillItems(matchingHosts hosts: [String]) -> [ItemSummary] {
+        guard !hosts.isEmpty else { return index.allItems }
+        // A page can name more than one host (its own and a sign-in domain), and
+        // an item matching several must still appear once.
+        var seen = Set<ItemSummary.ID>()
+        return hosts.flatMap { index.items(matchingHost: $0) }
+            .filter { seen.insert($0.id).inserted }
+    }
+
+    func autofillItem(recordIdentifier: String) -> ItemSummary? {
+        index.allItems.first { $0.id == recordIdentifier }
+    }
+}

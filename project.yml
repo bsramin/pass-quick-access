@@ -87,6 +87,15 @@ targets:
     platform: macOS
     sources:
       - path: Sources/PassQuickAccessAutoFill
+      # The protocol both ends speak, plus the two pieces of socket plumbing it
+      # is built on. Compiled into each target rather than factored into a shared
+      # framework: an embedded framework would need the by-hand re-signing the
+      # release script already does for Sparkle, and would have to satisfy
+      # library validation, which is a lot of machinery for a handful of value
+      # types and two files of POSIX calls.
+      - path: Sources/PassQuickAccess/AutoFill/Shared
+      - path: Sources/PassQuickAccess/SSH/UnixSocket.swift
+      - path: Sources/PassQuickAccess/SSH/CodeSignatureCheck.swift
     configFiles:
       Debug: Config/Signing.xcconfig
       Release: Config/Signing.xcconfig

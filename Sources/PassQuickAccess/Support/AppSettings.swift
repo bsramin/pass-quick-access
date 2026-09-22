@@ -37,6 +37,10 @@ enum SettingKey {
     static let webAppMatching = "webAppMatching"
     /// Opt-in: run the SSH agent proxy that gates key signatures behind Touch ID.
     static let sshAgentEnabled = "sshAgentEnabled"
+    /// Opt-in: answer the bundled AutoFill extension, so macOS can offer this
+    /// app's logins in the native password menu. Off means the socket the
+    /// extension looks for is never created, and the extension says as much.
+    static let autofillProviderEnabled = "autofillProviderEnabled"
     /// Optional vault name the upstream agent is limited to serving keys from.
     static let sshVaultFilter = "sshVaultFilter"
     /// Advanced override for the upstream `pass-cli` agent socket path; empty uses

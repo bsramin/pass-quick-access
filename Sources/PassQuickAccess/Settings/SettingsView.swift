@@ -93,6 +93,7 @@ struct GeneralSettings: View {
     @AppStorage(SettingKey.sortOrder) private var sortOrder = SortOrder.lastModified.rawValue
     @AppStorage(SettingKey.prioritizeFrequentlyUsed) private var prioritizeFrequentlyUsed = false
     @State private var loginItem = LoginItem.state
+    @State private var loginItemFailure: String?
 
     var body: some View {
         Form {
@@ -108,11 +109,15 @@ struct GeneralSettings: View {
                 Toggle("Open at login", isOn: Binding(
                     get: { loginItem == .on },
                     set: { wanted in
-                        LoginItem.setEnabled(wanted)
+                        loginItemFailure = LoginItem.setEnabled(wanted)
                         loginItem = LoginItem.state
                     }
                 ))
-                .disabled(loginItem == .unavailable)
+                if let loginItemFailure {
+                    Text(loginItemFailure)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                }
                 if loginItem == .awaitingApproval {
                     Button("Allow in System Settings…") { LoginItem.openSystemSettings() }
                         .buttonStyle(.link)
@@ -140,7 +145,10 @@ struct GeneralSettings: View {
         // remembered.
         .task {
             while !Task.isCancelled {
-                loginItem = LoginItem.state
+                let current = LoginItem.state
+                // A state change means the last complaint is stale.
+                if current != loginItem { loginItemFailure = nil }
+                loginItem = current
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -150,8 +158,6 @@ struct GeneralSettings: View {
         switch loginItem {
         case .awaitingApproval:
             return "macOS needs to allow this once, under Login Items in System Settings."
-        case .unavailable:
-            return "Available once the app is in your Applications folder."
         case .on, .off:
             return "A menu-bar app that isn't running answers no hotkey, signs no SSH key and has no AutoFill to offer, so this is worth leaving on."
         }

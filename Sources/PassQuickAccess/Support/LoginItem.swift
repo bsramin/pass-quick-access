@@ -23,36 +23,40 @@ enum LoginItem {
         /// macOS shows its own prompt once; afterwards the only way through is
         /// the Login Items pane.
         case awaitingApproval
-        /// No service to register, which is what a build running from a folder
-        /// macOS doesn't consider an installed app looks like.
-        case unavailable
     }
 
+    /// `notFound` is folded into `off` rather than given a state of its own.
+    /// Apple documents it as "no service to register", and an earlier version
+    /// of this read that as "this copy can't be a login item" and greyed the
+    /// switch out, on an app sitting in /Applications, registered, that
+    /// registers perfectly well when actually asked. A status is not a
+    /// permission: the way to find out whether registration works is to try it
+    /// and report what comes back.
     static var state: State {
         switch SMAppService.mainApp.status {
         case .enabled: return .on
         case .requiresApproval: return .awaitingApproval
-        case .notRegistered: return .off
-        case .notFound: return .unavailable
-        @unknown default: return .off
+        default: return .off
         }
     }
 
-    /// Returns whether it took. A failure is reported rather than swallowed
-    /// because the switch has to end up showing what macOS actually thinks, not
-    /// what the user asked for.
+    /// Returns nil when it took, or something to show the user when it didn't.
+    /// The switch has to end up showing what macOS thinks, not what was asked
+    /// of it, so a failure is surfaced rather than swallowed.
     @discardableResult
-    static func setEnabled(_ enabled: Bool) -> Bool {
+    static func setEnabled(_ enabled: Bool) -> String? {
         do {
             if enabled {
                 try SMAppService.mainApp.register()
             } else {
                 try SMAppService.mainApp.unregister()
             }
-            return true
+            return nil
         } catch {
-            NSLog("Login item could not be \(enabled ? "registered" : "unregistered"): \(error)")
-            return false
+            // Already in the asked-for state is not a failure worth reporting;
+            // the status read that follows will show it as done.
+            if (error as NSError).code == kSMErrorAlreadyRegistered { return nil }
+            return error.localizedDescription
         }
     }
 

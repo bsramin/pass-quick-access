@@ -32,13 +32,16 @@ struct AutoFillListView: View {
                 search
                 Divider()
                 list
-                Divider()
-                footer
             case .locked:
                 centered { locked }
             case let .message(text):
                 centered { message(text) }
             }
+            // Always the last thing in the sheet, whatever it is showing. A
+            // wait that can run to a minute while the vaults are read is the
+            // worst place of all to leave someone without a way out.
+            Divider()
+            footer
         }
         // Fills whatever the host gives it rather than insisting on a size.
         // The controller asks for one through preferredContentSize, which the
@@ -83,7 +86,8 @@ struct AutoFillListView: View {
     }
 
     /// Escape is handled by the host in some places and not others, so the way
-    /// out is always on screen as well.
+    /// out is on screen as well, in every state rather than only where a list
+    /// happened to be drawn.
     private var footer: some View {
         HStack {
             Spacer()
@@ -133,8 +137,6 @@ struct AutoFillListView: View {
             Text("Pass Quick Access is locked").font(.system(size: 13, weight: .medium))
             Button("Unlock") { model.unlock() }
                 .buttonStyle(.borderedProminent)
-            Button("Cancel", action: onCancel)
-                .buttonStyle(.link).font(.system(size: 11))
         }
     }
 
@@ -146,14 +148,12 @@ struct AutoFillListView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Cancel", action: onCancel)
-                .buttonStyle(.link).font(.system(size: 11))
         }
         .padding(.horizontal, 24)
     }
 
     private func centered<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack { Spacer(); content(); Spacer() }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

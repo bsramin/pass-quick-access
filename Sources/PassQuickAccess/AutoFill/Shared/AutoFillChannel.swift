@@ -80,6 +80,11 @@ enum AutoFillChannel {
         return "team:\(team):\(identifier)"
     }
 
+    /// Opening this starts the app if it isn't running. It carries no argument
+    /// and the handler reads none: waking the app is the whole of it, so this
+    /// grants a caller nothing they couldn't get by opening the app in Finder.
+    static let wakeURL = URL(string: "pass-quick-access://wake")
+
     /// The identity the app should present, for the extension to check the
     /// server against. Squatting the socket already requires the same app-group
     /// entitlement, so this is a second lock on the same door rather than the

@@ -50,6 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// The AutoFill extension opens `pass-quick-access://` when it finds nobody
+    /// listening. Launching is the entire effect: by the time this runs the app
+    /// is up and the server, if it is meant to be running, already is. Nothing
+    /// in the URL is read, so there is nothing in it to get wrong.
+    func application(_ application: NSApplication, open urls: [URL]) {}
+
     func applicationWillTerminate(_ notification: Notification) {
         agentController?.stop()
         autofillServer?.stop()

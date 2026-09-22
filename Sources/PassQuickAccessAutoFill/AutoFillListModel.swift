@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+import AppKit
 import Foundation
 import LocalAuthentication
 
@@ -77,8 +78,23 @@ final class AutoFillListModel: ObservableObject {
     /// worth putting on a socket.
     private func loadWaitingForTheIndex() async {
         let deadline = Date().addingTimeInterval(Self.indexWait)
+        var wokeTheApp = false
         while true {
             let result = await Self.send(.matches(services: services, kind: kind), authenticated: authenticated)
+
+            // Nobody listening. Start the app once and give it a moment: with
+            // the app closed there is nothing behind a password prompt at all,
+            // and telling someone mid-login to go and launch something is a
+            // poor substitute for launching it.
+            if !wokeTheApp, case let .failure(error) = result,
+               case .unavailable = error as? AutoFillClient.Failure ?? .transport {
+                wokeTheApp = true
+                note = "Starting Pass Quick Access…"
+                Self.wakeTheApp()
+                try? await Task.sleep(for: .milliseconds(600))
+                continue
+            }
+
             guard case let .success(response) = result,
                   case .failure(.indexNotReady) = response.body else {
                 apply(result)
@@ -199,6 +215,17 @@ final class AutoFillListModel: ObservableObject {
                 })
             }
         }
+    }
+
+    /// Opens the app's URL scheme, which launches it. A sandboxed extension may
+    /// not reach into another bundle, but it may ask LaunchServices to open a
+    /// URL, and the app's handler reads nothing from it.
+    private static func wakeTheApp() {
+        guard let url = AutoFillChannel.wakeURL else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        // The user is looking at a form, not at us.
+        configuration.activates = false
+        NSWorkspace.shared.open(url, configuration: configuration, completionHandler: nil)
     }
 
     /// Touch ID with the device password as the fallback, the same forgiving

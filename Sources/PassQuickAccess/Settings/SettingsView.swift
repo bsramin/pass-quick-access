@@ -92,6 +92,7 @@ struct SubTabBar<Tab: Identifiable & Equatable>: View {
 struct GeneralSettings: View {
     @AppStorage(SettingKey.sortOrder) private var sortOrder = SortOrder.lastModified.rawValue
     @AppStorage(SettingKey.prioritizeFrequentlyUsed) private var prioritizeFrequentlyUsed = false
+    @State private var loginItem = LoginItem.state
 
     var body: some View {
         Form {
@@ -101,6 +102,25 @@ struct GeneralSettings: View {
                 Text("Keyboard Shortcut")
             } footer: {
                 Text("⌘Space is reserved by Spotlight, so pick any free combination. It works from any app.")
+            }
+
+            Section {
+                Toggle("Open at login", isOn: Binding(
+                    get: { loginItem == .on },
+                    set: { wanted in
+                        LoginItem.setEnabled(wanted)
+                        loginItem = LoginItem.state
+                    }
+                ))
+                .disabled(loginItem == .unavailable)
+                if loginItem == .awaitingApproval {
+                    Button("Allow in System Settings…") { LoginItem.openSystemSettings() }
+                        .buttonStyle(.link)
+                }
+            } header: {
+                Text("Startup")
+            } footer: {
+                Text(startupFooter)
             }
 
             Section {
@@ -115,6 +135,26 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        // macOS owns this state and the user can revoke it in System Settings
+        // without the app hearing about it, so it is re-read rather than
+        // remembered.
+        .task {
+            while !Task.isCancelled {
+                loginItem = LoginItem.state
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private var startupFooter: String {
+        switch loginItem {
+        case .awaitingApproval:
+            return "macOS needs to allow this once, under Login Items in System Settings."
+        case .unavailable:
+            return "Available once the app is in your Applications folder."
+        case .on, .off:
+            return "A menu-bar app that isn't running answers no hotkey, signs no SSH key and has no AutoFill to offer, so this is worth leaving on."
+        }
     }
 }
 

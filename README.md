@@ -159,6 +159,14 @@ The workflow is the same one you already know:
   passphrase) instead of asking the agent. Remove the `IdentityFile` lines for
   the hosts you want served from Proton Pass.
 
+## Open at login
+
+Pass Quick Access lives in the menu bar, and while it isn't running there is no
+hotkey, no SSH agent and no AutoFill: the credential-provider extension is
+sandboxed and cannot read a vault by itself. Turn on **Settings → General →
+Open at login** and macOS starts it for you. If a password prompt finds the app
+closed, the extension asks macOS to start it and tries again.
+
 ## Security model
 
 - **Secrets are never persisted or indexed.** The in-memory index holds only

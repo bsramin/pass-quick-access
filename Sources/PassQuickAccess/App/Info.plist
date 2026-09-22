@@ -25,6 +25,25 @@
 	<!-- Agent app: lives in the menu bar, no Dock icon. -->
 	<key>LSUIElement</key>
 	<true/>
+	<!-- How the AutoFill extension wakes the app. It is sandboxed and cannot
+	     read a vault itself, so with the app closed a password prompt has
+	     nothing behind it; opening this URL starts the app and the extension
+	     then retries. The handler does nothing but exist: no arguments are
+	     read, nothing is filled, so a stranger opening it achieves what
+	     double-clicking the app achieves. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>it.ramin.PassQuickAccess.wake</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pass-quick-access</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock Pass Quick Access with Touch ID.</string>
 	<!-- Reads the active tab's URL from the frontmost browser to pre-select the

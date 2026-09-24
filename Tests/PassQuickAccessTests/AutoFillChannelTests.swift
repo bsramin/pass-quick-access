@@ -87,7 +87,14 @@ final class AutoFillWireTests: XCTestCase {
 /// and a fake `pass-cli`, so none of it needs a signed build or a real vault.
 @MainActor
 final class AutoFillServerTests: XCTestCase {
-    private let trusted = VerifiedPeer(identity: AutoFillChannel.expectedExtensionIdentity ?? "team:T:x")
+    /// Who the server under test is told to expect, and who the fake peer check
+    /// reports. Both are fixed here rather than taken from the channel: that
+    /// reads the identity out of the running build's own signature, so a bundle
+    /// signed with a development certificate produced one answer and the ad-hoc
+    /// one CI builds produced nil, which denied every request and failed every
+    /// test on CI alone.
+    private static let peerIdentity = "team:TESTTEAM:it.ramin.PassQuickAccess.AutoFill"
+    private let trusted = VerifiedPeer(identity: peerIdentity)
 
     func testAnUnverifiedCallerIsRefusedAndTheIndexIsNeverTouched() async throws {
         let index = FakeIndex()
@@ -292,6 +299,7 @@ final class AutoFillServerTests: XCTestCase {
             index: index,
             unlockWindow: unlockWindow ?? UnlockWindow(defaults: unlockedDefaults()),
             socketPath: "/dev/null",
+            expectedPeer: Self.peerIdentity,
             verifyPeer: { _ in verified }
         )
     }

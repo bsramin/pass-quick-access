@@ -36,10 +36,17 @@ final class AutoFillServer: @unchecked Sendable {
     private let index: any AutoFillIndexSource
     private let unlockWindow: UnlockWindow
     private let socketPath: String
-    /// Injectable so the routing can be tested over a `socketpair`, where there
-    /// is no signed peer to inspect. The default is the real check, and it is
-    /// the only thing standing between a caller and the vault, so it is never
-    /// weakened in a shipping path.
+    /// The one caller allowed to ask. Nil when this build carries no team, which
+    /// is what an ad-hoc signature looks like, and then nobody is allowed: such a
+    /// build cannot hold the entitlement the extension needs either.
+    ///
+    /// Injected rather than read from the channel at the point of use, so a test
+    /// states who it expects instead of inheriting whatever identity the machine
+    /// happened to sign the test bundle with.
+    private let expectedPeer: String?
+    /// Injectable for the same reason: a `socketpair` has no signed peer to
+    /// inspect. The default is the real check, and it is the only thing standing
+    /// between a caller and the vault, so no shipping path weakens it.
     private let verifyPeer: @Sendable (Int32) -> VerifiedPeer
     private var listener: AgentSocketListener?
     /// Bounds how long a connection thread waits for a request that never
@@ -51,12 +58,14 @@ final class AutoFillServer: @unchecked Sendable {
         index: any AutoFillIndexSource,
         unlockWindow: UnlockWindow,
         socketPath: String,
+        expectedPeer: String? = AutoFillChannel.expectedExtensionIdentity,
         verifyPeer: @escaping @Sendable (Int32) -> VerifiedPeer = { CodeSignatureCheck.verify(fd: $0) }
     ) {
         self.client = client
         self.index = index
         self.unlockWindow = unlockWindow
         self.socketPath = socketPath
+        self.expectedPeer = expectedPeer
         self.verifyPeer = verifyPeer
     }
 
@@ -84,8 +93,7 @@ final class AutoFillServer: @unchecked Sendable {
         // and an unverifiable peer fails closed because CodeSignatureCheck
         // reports no identity rather than guessing.
         let peer = verifyPeer(fd)
-        guard let expected = AutoFillChannel.expectedExtensionIdentity,
-              peer.identity == expected else {
+        guard let expected = expectedPeer, peer.identity == expected else {
             respond(.failure(.denied), to: fd)
             return
         }

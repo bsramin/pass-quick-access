@@ -30,7 +30,7 @@ enum AutoFillSuggestions {
             // row, and macOS would fill that blank into the username field.
             // Better absent from the menu than wrong in the form.
             guard let account = item.account else { continue }
-            for host in item.urls.compactMap(WebHost.from) {
+            for host in coveringHosts(of: item) {
                 let service = ASCredentialServiceIdentifier(identifier: host, type: .domain)
                 if item.hasPassword {
                     let identity = ASPasswordCredentialIdentity(
@@ -54,6 +54,22 @@ enum AutoFillSuggestions {
         }
 
         replace(with: identities)
+    }
+
+    /// The hosts to register an item under: its own, minus any that a broader
+    /// one already covers.
+    ///
+    /// One row per URL meant a login saved against google.com,
+    /// accounts.google.com and myaccount.google.com appeared in the menu three
+    /// times over, identical but for the domain under the username. macOS
+    /// matches within a site itself, so the broader entry is offered on the
+    /// subdomains anyway. Duplicate URLs collapse here too, since two of them
+    /// reduce to the same host as often as not.
+    static func coveringHosts(of item: ItemSummary) -> [String] {
+        let hosts = Set(item.urls.compactMap(WebHost.from))
+        return hosts
+            .filter { host in !hosts.contains { host.hasSuffix("." + $0) } }
+            .sorted()
     }
 
     /// Removes everything, for when the switch goes off, the provider is turned

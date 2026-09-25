@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Fixed
+- A login no longer appears once per URL in the AutoFill menu. An item saved
+  against google.com, accounts.google.com and myaccount.google.com showed three
+  identical rows; it now registers under the broadest host it holds, which macOS
+  offers on the others anyway.
 - The app no longer dies when a caller hangs up on it. Writing an answer to a
   connection that had already gone raised SIGPIPE, whose default is to kill the
   process, so dismissing an AutoFill sheet while the item was still being read

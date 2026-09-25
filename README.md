@@ -12,6 +12,10 @@ password or one-time code, or open the item's site in your browser. The same
 idea as 1Password's Quick Access, built for Proton Pass, which ships an Electron
 desktop app and no native quick-access of its own.
 
+It also answers **[System AutoFill](#system-autofill)**, the password menu built
+into macOS, so your Proton Pass logins appear in Safari and native apps the way
+iCloud Passwords does.
+
 > Not affiliated with or endorsed by Proton AG.
 
 ## 💛 Support the project
@@ -40,26 +44,36 @@ and I get a small reward if you subscribe.
 
 The app does not reimplement Proton's authentication or cryptography. It drives
 the official [`pass-cli`](https://github.com/protonpass/pass-cli), the
-Proton-maintained command-line client, and wraps it in a native macOS UI.
+Proton-maintained command-line client, and wraps it in a native macOS UI. Two
+front ends sit on top of it: the panel you summon yourself, and the credential
+provider macOS loads when something asks for a password. Only the app ever runs
+`pass-cli`.
 
 ```
-   ┌───────────────────────────────────────────┐
-   │ Floating panel (AppKit NSPanel + SwiftUI) │
-   │   hotkey ▸ search ▸ pick ▸ fill / copy    │
-   └───────────────┬───────────────────────────┘
-                   │ metadata only (titles, URLs, usernames)
-   ┌───────────────▼───────────────────────────┐
-   │ PassCLIClient  (actor over pass-cli)      │
-   │   vault list · item list · item view      │
-   └───────────────┬───────────────────────────┘
-                   │ secrets fetched just-in-time, never cached
-   ┌───────────────▼───────────────────────────┐
-   │ pass-cli  ▸  Proton Pass servers          │
-   └───────────────────────────────────────────┘
+   ┌───────────────────────────┐   ┌───────────────────────────┐
+   │ Floating panel (NSPanel)  │   │ AutoFill extension        │
+   │  hotkey ▸ search ▸ pick   │   │  sandboxed, asks the app  │
+   └─────────────┬─────────────┘   └─────────────┬─────────────┘
+                 │                               │ socket in the shared
+                 │ metadata only                 │ container, both ends
+                 │ (titles, URLs,                │ check the signature
+                 │  usernames)                   │
+   ┌─────────────▼───────────────────────────────▼───────────┐
+   │ PassCLIClient  (actor over pass-cli)                    │
+   │   vault list, item list, item view                      │
+   └─────────────┬───────────────────────────────────────────┘
+                 │ secrets fetched just-in-time, never cached
+   ┌─────────────▼───────────────────────────────────────────┐
+   │ pass-cli  ▸  Proton Pass servers                        │
+   └─────────────────────────────────────────────────────────┘
 ```
 
 ## Features
 
+- **Answers macOS System AutoFill.** Click the key icon in any login field and
+  pick Pass Quick Access: no keystrokes, no Accessibility access, and it reaches
+  native apps and not only browsers. One-time codes too, on macOS 15 and later.
+  Off until you turn it on. [Details below](#system-autofill).
 - **Floating search panel** summoned by a global hotkey (default ⌥⇧Space,
   configurable). It opens over any app without pulling you out of it, and
   dismisses when it loses focus.
@@ -76,7 +90,9 @@ Proton-maintained command-line client, and wraps it in a native macOS UI.
 - **Autofill into the app you came from**: rather than copy, the app types the
   login into the focused field of whatever was frontmost, in any browser or app,
   by sending real keystrokes. Pick whether choosing an item fills, copies, or
-  both under **Settings → Autofill**. Filling needs macOS Accessibility access.
+  both under **Settings → Autofill**. Filling needs macOS Accessibility access;
+  [System AutoFill](#system-autofill) does not, and is the better route where
+  macOS offers it.
 - **Knows the page you're on**: open the panel over a browser and the item for
   the current tab is selected for you; when several match the same site, the list
   is filtered to those. Safari and Chromium browsers are read over Automation;
@@ -98,6 +114,72 @@ Proton-maintained command-line client, and wraps it in a native macOS UI.
   You can opt in to fetching favicons, with a clear notice of what that shares.
   Favicons are never fetched for local or private addresses, including hostnames
   that resolve to one, so the feature stays off your local network.
+
+## System AutoFill
+
+**Pass Quick Access answers the password menu built into macOS**, the one Safari
+and native apps already show. Click the key icon in a login field, pick Pass
+Quick Access, and your Proton Pass logins are there, next to iCloud Passwords.
+Proton Pass ships no native AutoFill on the Mac, so until now the only way into
+that menu was to keep your logins somewhere else.
+
+It is a different thing from the app typing for you:
+
+- **Nothing is typed.** Filling from the panel synthesises keystrokes into
+  whatever has focus, which needs Accessibility access and a guess about which
+  field you meant. Here macOS asks for the credential and fills the field
+  itself, so there is no guessing and no Accessibility permission.
+- **It reaches native apps**, not only browsers.
+- **Secrets are still read just in time.** The bundled extension is sandboxed
+  and reads nothing itself. It asks the app over a socket in a shared container,
+  and only the app ever runs `pass-cli`, so the password is fetched at the moment
+  you pick the item. Both ends verify the other's code signature before a byte
+  is exchanged.
+- **One-time codes too**, on macOS 15 and later, where the system asks for
+  verification codes the same way.
+
+### Setting it up
+
+1. Turn on **Answer macOS AutoFill** in *Settings → Autofill → System*.
+2. In **System Settings → General → AutoFill & Passwords**, turn Pass Quick
+   Access on under "AutoFill from". Turn Apple's own Passwords off there too if
+   you'd rather not be offered both.
+3. Click the key icon in any password field and pick Pass Quick Access. Your
+   logins for that site come first, the rest of the vault below.
+
+Two switches because macOS owns the second one. The app cannot register itself
+as a provider, and it cannot unregister itself either: to stop offering AutoFill,
+use System Settings rather than the app.
+
+### Your logins named in the menu
+
+For a row to carry your username before you have picked this app, macOS needs a
+list of them. That is off by default and has its own switch, because it is the
+one thing in the app that writes outside its own memory: turning it on saves each
+login's website and username, and an opaque reference to the item, into the
+password database macOS manages. Never a password, never a one-time code, never
+anything else from the item. Turning it off removes what was written. With it off
+AutoFill still works, you just pick Pass Quick Access and search.
+
+### Good to know
+
+- **Where it works:** Safari and native apps. Chrome, Firefox and the rest don't
+  use the system provider, so there you summon the panel with the hotkey and let
+  the app type, exactly as before. The two live side by side, and turning one on
+  takes nothing away from the other.
+- **Two Touch ID prompts?** macOS has its own *Use Touch ID for autofilling
+  passwords* under Touch ID & Password, on by default, and it asks in addition to
+  this app's optional lock. Turn off whichever of the two you'd rather not
+  answer; both are yours to set.
+- **No passkeys.** Providing one means holding the credential's private key and
+  signing the WebAuthn challenge, and `pass-cli` exposes neither, so the app
+  stays out of the passkey picker rather than appearing there and failing.
+- **macOS 27.0:** some sign-in forms crash Safari when a password manager fills
+  them, 1Password included. It is a defect in Safari's own form filling rather
+  than in any extension, it is reported to Apple, and nothing a credential
+  provider sends can prevent it.
+- The app has to be running, since the extension cannot read a vault by itself.
+  See [Open at login](#open-at-login).
 
 ## SSH agent
 

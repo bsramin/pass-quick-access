@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2026-09-25.1
 
 ### Fixed
 - A login no longer appears once per URL in the AutoFill menu. An item saved

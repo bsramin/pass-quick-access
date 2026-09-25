@@ -123,6 +123,8 @@ Quick Access, and your Proton Pass logins are there, next to iCloud Passwords.
 Proton Pass ships no native AutoFill on the Mac, so until now the only way into
 that menu was to keep your logins somewhere else.
 
+![The macOS password menu offering a Proton Pass login through Pass Quick Access](docs/screenshots/autofill.png)
+
 It is a different thing from the app typing for you:
 
 - **Nothing is typed.** Filling from the panel synthesises keystrokes into

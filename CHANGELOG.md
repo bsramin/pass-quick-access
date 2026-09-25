@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The app no longer dies when a caller hangs up on it. Writing an answer to a
+  connection that had already gone raised SIGPIPE, whose default is to kill the
+  process, so dismissing an AutoFill sheet while the item was still being read
+  was enough to take the app down with no crash report and no line in the log.
+  The SSH agent went with it, and all that was left was AutoFill reporting that
+  Pass Quick Access isn't running and `ssh` falling back to "Permission denied
+  (publickey)".
+- A second copy of the app no longer takes the sockets from the first. Binding
+  over a socket someone else is serving used to unlink theirs, which doesn't
+  stop them: it leaves them listening to an inode with no name, reachable by
+  nobody. A socket genuinely left behind by a process that died is still
+  cleared. A second copy now also hands over to the one already running and
+  quits.
+- Running the test suite no longer breaks the installed app. XCTest launches the
+  app to host the tests, and it went on to set itself up in full, sockets
+  included.
+- "Answer macOS AutoFill" takes effect when you switch it, instead of at the
+  next launch. Switching it on started nothing, switching it off stopped
+  nothing, and a lost socket could only come back by quitting the app.
+- When the extension finds nobody listening it now gets the socket rebound,
+  rather than only asking macOS to open an app that was already running, and it
+  keeps asking for a few seconds instead of once.
+
 ## v2026-09-23.1
 
 ### Added

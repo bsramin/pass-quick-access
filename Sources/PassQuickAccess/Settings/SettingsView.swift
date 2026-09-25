@@ -168,6 +168,8 @@ struct GeneralSettings: View {
 /// needs, and matching the item to the page open in the browser. Split into sub-
 /// tabs since it covers three distinct blocks.
 struct AutofillSettings: View {
+    @ObservedObject var autofill: AutoFillCoordinator
+
     enum Block: String, CaseIterable, Identifiable {
         case action, filling, browser, system
         var id: String { rawValue }
@@ -229,6 +231,13 @@ struct AutofillSettings: View {
     private var system: some View {
         Section {
             Toggle("Answer macOS AutoFill", isOn: $providerEnabled)
+            if let failure = autofill.failure {
+                LabeledContent("Status") {
+                    Label(failure, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .labelStyle(.titleAndIcon)
+                }
+            }
             Button("Open System Settings…") {
                 guard let url = URL(string: "x-apple.systempreferences:com.apple.preferences.password") else { return }
                 NSWorkspace.shared.open(url)
@@ -251,6 +260,11 @@ struct AutofillSettings: View {
                 suggestionList = false
                 AutoFillSuggestions.clear()
             }
+        }
+        // Keyed on the setting rather than onChange, so the server is also
+        // brought in line the first time this pane is shown.
+        .task(id: providerEnabled) {
+            autofill.applyEnabledSetting()
         }
     }
 

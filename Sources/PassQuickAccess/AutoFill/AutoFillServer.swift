@@ -80,6 +80,10 @@ final class AutoFillServer: @unchecked Sendable {
         listener = nil
     }
 
+    /// Whether the socket still leads here. False once another process has
+    /// replaced the file, which leaves this server listening to nobody.
+    var isReachable: Bool { listener?.isReachable ?? false }
+
     // MARK: - One connection
 
     /// Serves one connection to completion. Internal so a test can drive it over

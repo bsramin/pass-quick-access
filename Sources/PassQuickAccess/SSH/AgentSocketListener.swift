@@ -14,12 +14,19 @@ import Foundation
 /// ones get accepted but never served, which surfaces as a "Permission denied
 /// (publickey)" until the agent is toggled off and on. A dedicated thread sidesteps
 /// the ceiling: a new connection is always served at once.
+///
+/// The same symptom has a second cause the thread doesn't touch: a socket file
+/// replaced by another process leaves this listener running and unreachable.
+/// `isReachable` reports that.
 final class AgentSocketListener: @unchecked Sendable {
     private let path: String
     private let onAccept: @Sendable (Int32) -> Void
     private let acceptQueue = DispatchQueue(label: "it.ramin.PassQuickAccess.ssh.accept")
     private var listenFD: Int32 = -1
     private var source: DispatchSourceRead?
+    /// The socket file this listener created, so `stop` removes that one and
+    /// not whatever replaced it.
+    private var boundInode: UInt64?
 
     init(path: String, onAccept: @escaping @Sendable (Int32) -> Void) {
         self.path = path
@@ -32,6 +39,7 @@ final class AgentSocketListener: @unchecked Sendable {
         // readiness event without blocking on the next accept.
         _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK)
         listenFD = fd
+        boundInode = UnixSocket.inode(at: path)
 
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: acceptQueue)
         let onAccept = self.onAccept
@@ -60,6 +68,12 @@ final class AgentSocketListener: @unchecked Sendable {
         source?.cancel()
         source = nil
         listenFD = -1
-        try? FileManager.default.removeItem(atPath: UnixSocket.expand(path))
+        UnixSocket.removeSocket(at: path, ifInode: boundInode)
+        boundInode = nil
+    }
+
+    /// Whether the path this listener bound still reaches it.
+    var isReachable: Bool {
+        boundInode != nil && UnixSocket.inode(at: path) == boundInode
     }
 }

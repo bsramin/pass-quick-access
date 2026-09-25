@@ -15,12 +15,37 @@ enum UnixSocket {
     /// the trailing NUL.
     static let maxPathLength = 104
 
-    enum Failure: Error, Equatable {
+    enum Failure: Error, Equatable, CustomStringConvertible {
         case pathTooLong(String)
+        /// Another process is serving this path.
+        case alreadyInUse(String)
         case socketCreateFailed(Int32)
         case bindFailed(Int32)
         case listenFailed(Int32)
         case connectFailed(Int32)
+
+        /// The SSH agent shows this in its status line, so it can't read as a
+        /// raw enum case.
+        var description: String {
+            switch self {
+            case let .pathTooLong(path):
+                return "the socket path is longer than macOS allows: \(path)"
+            case let .alreadyInUse(path):
+                return "another copy of Pass Quick Access is already serving \(path)"
+            case let .socketCreateFailed(code):
+                return "couldn't create the socket (\(Failure.reason(code)))"
+            case let .bindFailed(code):
+                return "couldn't bind the socket (\(Failure.reason(code)))"
+            case let .listenFailed(code):
+                return "couldn't listen on the socket (\(Failure.reason(code)))"
+            case let .connectFailed(code):
+                return "couldn't connect to the socket (\(Failure.reason(code)))"
+            }
+        }
+
+        private static func reason(_ code: Int32) -> String {
+            String(cString: strerror(code))
+        }
     }
 
     /// Expands a leading `~` to the user's home directory.
@@ -28,14 +53,24 @@ enum UnixSocket {
         (path as NSString).expandingTildeInPath
     }
 
-    /// Creates, binds and listens on a Unix socket at `path`. Any stale socket
-    /// file is removed first, and the new socket is created with `0600`
-    /// permissions so only the user can reach it. Returns the listening fd.
+    /// Creates, binds and listens on a Unix socket at `path`. A stale socket file
+    /// is removed first, and the new socket is created with `0600` permissions so
+    /// only the user can reach it. Returns the listening fd.
+    ///
+    /// Throws `alreadyInUse` rather than taking a path someone else is serving.
+    /// Unlinking a bound socket doesn't stop its owner, it leaves them serving an
+    /// inode with no name: healthy from the inside, reachable by nobody.
     static func listen(at path: String, backlog: Int32 = 16) throws -> Int32 {
         let expanded = expand(path)
         guard expanded.utf8.count < maxPathLength else { throw Failure.pathTooLong(expanded) }
 
+        // A file left by a process that died refuses connections; one that
+        // answers is still in use. Probed through connect rather than stat: a
+        // build without the app-group entitlement can't stat the group
+        // container, but the socket namespace answers it either way.
+        if isServed(at: expanded) { throw Failure.alreadyInUse(expanded) }
         try? FileManager.default.removeItem(atPath: expanded)
+
         let parent = (expanded as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(
             atPath: parent, withIntermediateDirectories: true,
@@ -44,6 +79,7 @@ enum UnixSocket {
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw Failure.socketCreateFailed(errno) }
+        ignoreBrokenPipe(on: fd)
 
         // Restrict the socket to the owner before it accepts a single connection.
         let previousMask = umask(0o077)
@@ -70,6 +106,40 @@ enum UnixSocket {
         return fd
     }
 
+    /// Turns a write to a hung-up peer into `EPIPE`, which `writeAll` already
+    /// reports as a failed connection, instead of SIGPIPE, whose default
+    /// disposition kills the process. Peers do hang up: a dismissed AutoFill
+    /// sheet closes the socket while the app is still reading the item.
+    ///
+    /// Set on the listening socket only, since `accept` inherits it the way it
+    /// inherits `O_NONBLOCK`.
+    static func ignoreBrokenPipe(on fd: Int32) {
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+    }
+
+    /// Whether something is listening at `path` right now.
+    static func isServed(at path: String) -> Bool {
+        guard let fd = try? connect(to: path) else { return false }
+        close(fd)
+        return true
+    }
+
+    /// The inode of the socket file at `path`, recorded after a bind so the file
+    /// can be matched against it later.
+    static func inode(at path: String) -> UInt64? {
+        var info = stat()
+        guard stat(expand(path), &info) == 0 else { return nil }
+        return info.st_ino
+    }
+
+    /// Removes the socket file only while it is still the one `inode` named. A
+    /// replaced file belongs to whoever replaced it.
+    static func removeSocket(at path: String, ifInode inode: UInt64?) {
+        guard let inode, self.inode(at: path) == inode else { return }
+        try? FileManager.default.removeItem(atPath: expand(path))
+    }
+
     /// Connects to the upstream Unix socket at `path`, returning the connected fd.
     static func connect(to path: String) throws -> Int32 {
         let expanded = expand(path)
@@ -77,6 +147,7 @@ enum UnixSocket {
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw Failure.socketCreateFailed(errno) }
+        ignoreBrokenPipe(on: fd)
 
         var addr = makeAddr(path: expanded)
         let connected = withUnsafePointer(to: &addr) {

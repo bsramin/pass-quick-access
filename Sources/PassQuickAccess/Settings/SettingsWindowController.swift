@@ -11,6 +11,7 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private let agentController: AgentProxyController?
+    private let autofill: AutoFillCoordinator?
     private let reconnector: PATReconnector?
     /// One hosting controller for the window's life; its `rootView` is swapped per
     /// pane. `sizingOptions` is empty so it never drives the window size; the frame
@@ -24,8 +25,13 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
     private static let width: CGFloat = 520
 
-    init(agentController: AgentProxyController?, reconnector: PATReconnector?) {
+    init(
+        agentController: AgentProxyController?,
+        autofill: AutoFillCoordinator?,
+        reconnector: PATReconnector?
+    ) {
         self.agentController = agentController
+        self.autofill = autofill
         self.reconnector = reconnector
 
         let window = NSWindow(
@@ -112,7 +118,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         let content: AnyView
         switch pane {
         case .general: content = AnyView(GeneralSettings())
-        case .autofill: content = AnyView(AutofillSettings())
+        case .autofill: content = AnyView(autofillView)
         case .security: content = AnyView(SecuritySettings())
         case .icons: content = AnyView(IconSettings())
         case .account: content = AnyView(AccountSettingsView(reconnector: reconnector))
@@ -120,6 +126,19 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         case .about: content = AnyView(AboutSettings(highlightSponsor: highlightSponsorOnAbout))
         }
         return content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder
+    private var autofillView: some View {
+        if let autofill {
+            AutofillSettings(autofill: autofill)
+        } else {
+            ContentUnavailableView(
+                "pass-cli not found",
+                systemImage: "rectangle.and.pencil.and.ellipsis",
+                description: Text("Install pass-cli and relaunch to use AutoFill.")
+            )
+        }
     }
 
     @ViewBuilder

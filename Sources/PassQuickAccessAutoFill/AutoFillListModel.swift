@@ -78,19 +78,22 @@ final class AutoFillListModel: ObservableObject {
     /// worth putting on a socket.
     private func loadWaitingForTheIndex() async {
         let deadline = Date().addingTimeInterval(Self.indexWait)
-        var wokeTheApp = false
+        var wakeAttempts = 0
         while true {
             let result = await Self.send(.matches(services: services, kind: kind), authenticated: authenticated)
 
-            // Nobody listening. Start the app once and give it a moment: with
-            // the app closed there is nothing behind a password prompt at all,
-            // and telling someone mid-login to go and launch something is a
-            // poor substitute for launching it.
-            if !wokeTheApp, case let .failure(error) = result,
-               case .unavailable = error as? AutoFillClient.Failure ?? .transport {
-                wokeTheApp = true
+            // Nobody listening. Open the app's URL once and keep asking for a
+            // few seconds: with the app closed there is nothing behind a
+            // password prompt at all, and telling someone mid-login to go and
+            // launch something is a poor substitute for launching it. The app
+            // reads that URL as a cue to rebind too, so this also covers a
+            // socket that went missing under a running app.
+            if case let .failure(error) = result,
+               case .unavailable = error as? AutoFillClient.Failure ?? .transport,
+               wakeAttempts < Self.wakeAttempts {
+                if wakeAttempts == 0 { Self.wakeTheApp() }
+                wakeAttempts += 1
                 note = "Starting Pass Quick Access…"
-                Self.wakeTheApp()
                 try? await Task.sleep(for: .milliseconds(600))
                 continue
             }
@@ -113,6 +116,10 @@ final class AutoFillListModel: ObservableObject {
     /// real work and the alternative is telling the user something is wrong
     /// when nothing is.
     private static let indexWait: TimeInterval = 60
+
+    /// How many times to ask again after opening the app's URL, 600ms apart.
+    /// A cold launch needs more than the single retry this used to allow.
+    private static let wakeAttempts = 5
 
     /// Runs the system's own authentication, then asks again. The prompt belongs
     /// here rather than in the app: raised from the extension it appears over
@@ -193,7 +200,11 @@ final class AutoFillListModel: ObservableObject {
     /// thing.
     private static func describe(_ error: Error) -> String {
         switch error as? AutoFillClient.Failure {
-        case .unavailable:
+        case let .unavailable(reason):
+            // No team on the signature, no reachable container, and a socket
+            // nobody is bound to all read the same on screen and are nothing
+            // alike underneath, so the reason goes to the log.
+            NSLog("AutoFill couldn't reach Pass Quick Access: \(reason)")
             return notRunningMessage
         case .transport:
             return "Pass Quick Access stopped answering. Try again."

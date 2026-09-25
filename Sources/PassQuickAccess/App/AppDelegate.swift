@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var controller: QuickAccessController?
     private var agentController: AgentProxyController?
-    private var autofillServer: AutoFillServer?
+    private var autofill: AutoFillCoordinator?
     private var reconnector: PATReconnector?
     private var settingsWindowController: SettingsWindowController?
     private let updateController = UpdateController()
@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updateObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isTestHost, !handedOverToRunningInstance() else { return }
+
         // The browser-tab suggestion defaults on; every other setting is happy
         // with its off/zero default, so only this one needs registering.
         UserDefaults.standard.register(defaults: [SettingKey.matchActiveTab: true])
@@ -40,7 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.preloadIndexIfUnlocked()
         self.controller = controller
 
-        startAutoFillServer(client: client, controller: controller)
+        let autofill = AutoFillCoordinator(client: client, controller: controller)
+        autofill.applyEnabledSetting()
+        self.autofill = autofill
 
         let agent = AgentProxyController(executable: executable, reconnector: reconnector)
         self.agentController = agent
@@ -51,35 +55,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The AutoFill extension opens `pass-quick-access://` when it finds nobody
-    /// listening. Launching is the entire effect: by the time this runs the app
-    /// is up and the server, if it is meant to be running, already is. Nothing
-    /// in the URL is read, so there is nothing in it to get wrong.
-    func application(_ application: NSApplication, open urls: [URL]) {}
+    /// listening. Launching is no help when the app is already running, so this
+    /// rebinds the socket instead. Nothing in the URL is read.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        autofill?.ensureServing()
+    }
+
+    /// XCTest launches the app to host the test bundle. The tests build what
+    /// they need themselves, and setting up for real would bind both sockets,
+    /// taking them from the copy the user is running for the length of the run.
+    private var isTestHost: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// Quits if another copy is already running, and reports whether it did.
+    /// Two copies mean two status items, two registrations of the same hotkey
+    /// and two `pass-cli` clients contending for `SessionLock`.
+    ///
+    /// `PQA_ALLOW_SECOND_INSTANCE` is for running a development build alongside
+    /// the installed one, which `UnixSocket.listen` now makes harmless.
+    private func handedOverToRunningInstance() -> Bool {
+        guard ProcessInfo.processInfo.environment["PQA_ALLOW_SECOND_INSTANCE"] == nil,
+              let identifier = Bundle.main.bundleIdentifier else { return false }
+        let mine = ProcessInfo.processInfo.processIdentifier
+        let others = NSRunningApplication
+            .runningApplications(withBundleIdentifier: identifier)
+            .filter { $0.processIdentifier != mine }
+        guard !others.isEmpty else { return false }
+        NSLog("Another copy of Pass Quick Access is already running, so this one is quitting.")
+        NSApp.terminate(nil)
+        return true
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         agentController?.stop()
-        autofillServer?.stop()
-    }
-
-    /// Opens the channel the bundled credential provider talks to. Opt-in, and
-    /// quietly impossible in a build that isn't signed with a team: the socket
-    /// lives in an app-group container that only a provisioned build can reach,
-    /// which is the same reason such a build's extension is never offered.
-    private func startAutoFillServer(client: PassCLIClient, controller: QuickAccessController) {
-        guard UserDefaults.standard.bool(forKey: SettingKey.autofillProviderEnabled) else { return }
-        guard let path = AutoFillChannel.socketPath else { return }
-        let server = AutoFillServer(
-            client: client,
-            index: controller.viewModel,
-            unlockWindow: controller.unlockWindow,
-            socketPath: path
-        )
-        do {
-            try server.start()
-            autofillServer = server
-        } catch {
-            NSLog("AutoFill server could not start: \(error)")
-        }
+        autofill?.stop()
     }
 
     private func installStatusItem() {
@@ -238,8 +248,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        let controller = settingsWindowController
-            ?? SettingsWindowController(agentController: agentController, reconnector: reconnector)
+        let controller = settingsWindowController ?? SettingsWindowController(
+            agentController: agentController, autofill: autofill, reconnector: reconnector
+        )
         settingsWindowController = controller
         NSApp.activate(ignoringOtherApps: true)
         controller.showWindow(nil)

@@ -3,6 +3,48 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-10-25.1</title>
+      <pubDate>Sun, 25 Oct 2026 13:57:35 +0000</pubDate>
+      <sparkle:version>20261025.1</sparkle:version>
+      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>### Added
+- The panel and System AutoFill answer at launch. Reading the vaults is one
+  `pass-cli` run per vault, long enough that a fill right after login sat
+  through a spinner for something the previous launch had already read. The rows
+  from the last complete read are now kept in
+  `~/Library/Application Support/PassQuickAccess/index.sealed`, sealed with
+  AES-256-GCM under a 32-byte key held in the Keychain for this Mac only, and
+  the vaults are re-read in the background on the usual freshness window. The
+  file holds what a row shows and matches on, never a password or a one-time
+  code, and not the item's note or custom fields either: those are searched from
+  memory and are back once the first refresh lands. It is `0600` in a `0700`
+  directory, excluded from backups, and removed when the session goes. A file
+  that cannot be opened reads as no cache at all, so the worst a bad one costs
+  is the cold start it was meant to save.
+
+### Changed
+- pass-cli 2.5 is now the oldest release the app drives. 2.5.0 removed logging
+  in with credentials and added `autofill_urls` to an item's content, and
+  carrying a path for each older release means testing against a tool that is
+  not mine. The app reads `pass-cli --version` at launch and, when it finds
+  something older, offers the download page once instead of failing later in a
+  command. A version line it cannot parse is left alone and allowed to run.
+  Nothing else changes for 2.5.1: the three fields it added to `item list` are
+  ignored, and `vault list`, `item totp` and `item view` are byte for byte what
+  2.4.1 printed.
+- The list footer keeps its keyboard hints while the index is refreshing. The
+  hints only ever made way for progress because the first pass over the vaults
+  shows rows as they arrive, where a missing item may just not have landed yet.
+  A refresh runs behind a list that is already complete and lasts as long as a
+  read of every vault, so it took the hints away at exactly the moment they were
+  being used. The spinner in the search field still marks it. For the same
+  reason a query with no match now says so during a refresh, instead of showing
+  the loader as though the list were incomplete.
+</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-10-25.1/PassQuickAccess.zip" sparkle:edSignature="cuC/o/y6iG7IQLikJZQpckC1VgNZR4lmDCA5KAojHyXZpeJBVDjgJ9Hm3cAYHjlb9n5OWWOmN99VyipBcm5rCw==" length="5214698" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-09-25.1</title>
       <pubDate>Fri, 25 Sep 2026 12:33:16 +0000</pubDate>
       <sparkle:version>20260925.1</sparkle:version>

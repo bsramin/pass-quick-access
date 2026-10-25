@@ -179,6 +179,10 @@ final class QuickAccessViewModel: ObservableObject {
     /// When a pass last read every vault, and how long that read stays good for.
     private var lastIndexedAt: Date?
     private let indexFreshness: TimeInterval
+    /// The encrypted copy of the index on disk, when there is one. Nil in the
+    /// tests that have nothing to say about it, and in a build where the key
+    /// could not be reached.
+    private let cache: IndexCache?
     /// True while the panel is showing the list filtered to a browser tab's domain
     /// because several items matched it. Keeps the list visible with no query.
     @Published private(set) var contextListActive = false
@@ -187,12 +191,14 @@ final class QuickAccessViewModel: ObservableObject {
         client: PassCLIClient,
         usage: UsageTracker = UsageTracker(),
         indexFreshness: TimeInterval = 300,
-        busyNoticeDelay: Duration = .milliseconds(400)
+        busyNoticeDelay: Duration = .milliseconds(400),
+        cache: IndexCache? = nil
     ) {
         self.client = client
         self.usage = usage
         self.indexFreshness = indexFreshness
         self.busyNoticeDelay = busyNoticeDelay
+        self.cache = cache
     }
 
     /// Whether the most-used opt-in is on, so the list floats frequently used
@@ -316,7 +322,34 @@ final class QuickAccessViewModel: ObservableObject {
             await refreshIfStale()
             return
         }
+        // A launch has rows on screen before `pass-cli` has run once, and then
+        // goes through the ordinary freshness check, so a cache within the
+        // window costs nothing and a stale one is re-read in the same breath.
+        if loadState == .idle, restoreFromCache() {
+            await refreshIfStale()
+            return
+        }
         await reload()
+    }
+
+    /// Adopts the index saved by the last complete pass. Returns whether there
+    /// was one: a cache that is missing, unreadable, or from an older shape of
+    /// the row simply leaves the first vault read in charge, which is what the
+    /// app did before there was a cache at all.
+    private func restoreFromCache() -> Bool {
+        guard let snapshot = cache?.load(), !snapshot.items.isEmpty else { return false }
+        lastIndexedAt = snapshot.savedAt
+        index = SearchIndex(items: snapshot.items, usage: usage.snapshot)
+        loadState = .ready
+        refilterPreservingSelection()
+        // The suggestion list macOS draws from is already on disk, in the
+        // system's own store, so it is left to the first complete pass rather
+        // than republished from rows that may since have moved.
+        return true
+    }
+
+    private func persist(_ items: [ItemSummary], indexedAt: Date) {
+        try? cache?.save(items, at: indexedAt)
     }
 
     /// The result of one streaming index pass over the vaults.
@@ -346,6 +379,11 @@ final class QuickAccessViewModel: ObservableObject {
                 return
             case .signedOut:
                 if attempt == 0, await onSilentReconnect?() == true { continue }
+                // Only a lost session takes the cache with it. A CLI that could
+                // not be reached says nothing about whether these rows are still
+                // yours, and throwing them away would buy a cold start for
+                // nothing.
+                cache?.remove()
                 enterFailure(Self.signedOutMessage)
                 return
             case .failed(let message):
@@ -405,7 +443,9 @@ final class QuickAccessViewModel: ObservableObject {
             return
         }
 
-        lastIndexedAt = Date()
+        let indexedAt = Date()
+        lastIndexedAt = indexedAt
+        persist(accumulated, indexedAt: indexedAt)
         index = SearchIndex(items: accumulated, usage: usage.snapshot)
         usage.prune(keeping: Set(accumulated.map(\.id)))
         publishAutoFillSuggestions(accumulated)
@@ -438,7 +478,9 @@ final class QuickAccessViewModel: ObservableObject {
             }
             loadState = .ready
             loadingDetail = nil
-            lastIndexedAt = Date()
+            let indexedAt = Date()
+            lastIndexedAt = indexedAt
+            persist(accumulated, indexedAt: indexedAt)
             usage.prune(keeping: Set(accumulated.map(\.id)))
             publishAutoFillSuggestions(accumulated)
             refilterPreservingSelection()

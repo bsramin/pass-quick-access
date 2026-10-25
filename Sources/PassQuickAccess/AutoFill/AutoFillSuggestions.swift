@@ -5,17 +5,17 @@ import Foundation
 
 /// The list macOS needs in order to name your logins in the AutoFill menu.
 ///
-/// Everything else this app does keeps its index in memory and nowhere else.
-/// This does not: a suggestion the system draws before the extension has been
-/// asked for anything has to come from something the system already holds, so
-/// turning it on saves each login's site and username, plus an opaque reference
-/// to the item, into the password database macOS manages. Never a password,
-/// never a one-time code, and never a note, URL path or anything else from the
-/// item.
+/// A suggestion the system draws before the extension has been asked for
+/// anything has to come from something the system already holds, so turning it
+/// on saves each login's site and username, plus an opaque reference to the
+/// item, into the password database macOS manages. Never a password, never a
+/// one-time code, and never a note, URL path or anything else from the item.
 ///
-/// It is off by default and it is the only thing in the app that writes outside
-/// its own memory, which is why the switch explains itself and why SECURITY.md
-/// calls it out by name. Turning it off removes what was written.
+/// It is off by default and it is the only thing the app writes into a store it
+/// does not own: the sealed index in `IndexCache` is the app's own file, under
+/// its own key, and goes no further. That is why this switch explains itself
+/// and why SECURITY.md calls it out by name. Turning it off removes what was
+/// written.
 @MainActor
 enum AutoFillSuggestions {
     /// Replaces the stored list with what the index currently holds. Called

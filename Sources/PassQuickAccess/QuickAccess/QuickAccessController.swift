@@ -54,7 +54,7 @@ final class QuickAccessController {
         self.reconnector = reconnector
         self.updateController = updateController
         self.webLogin = WebLogin(executable: executable)
-        viewModel = QuickAccessViewModel(client: client)
+        viewModel = QuickAccessViewModel(client: client, cache: IndexCache.onDisk())
         viewModel.onDismiss = { [weak self] in self?.hide() }
         viewModel.onSignIn = { [weak self] in self?.beginSignIn() }
         viewModel.onReconnect = { [weak self] in self?.beginReconnect() }

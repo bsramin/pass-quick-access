@@ -74,6 +74,10 @@ provider macOS loads when something asks for a password. Only the app ever runs
   pick Pass Quick Access: no keystrokes, no Accessibility access, and it reaches
   native apps and not only browsers. One-time codes too, on macOS 15 and later.
   Off until you turn it on. [Details below](#system-autofill).
+- **Ready at launch.** The rows from the last read are kept in an encrypted file,
+  so the panel and System AutoFill answer straight away instead of waiting for a
+  `pass-cli` run per vault, and the vaults are re-read behind you. No secret is
+  in that file, and neither are notes or custom fields.
 - **Floating search panel** summoned by a global hotkey (default ⌥⇧Space,
   configurable). It opens over any app without pulling you out of it, and
   dismisses when it loses focus.
@@ -253,20 +257,23 @@ closed, the extension asks macOS to start it and tries again.
 
 ## Security model
 
-- **Secrets are never persisted or indexed.** The in-memory index holds only
-  titles, URLs, usernames and the presence of a password or one-time code, never
-  the secret values. Passwords and codes are read fresh from `pass-cli` at the
-  moment you copy them, handed to the pasteboard, and the pasteboard entry is
-  marked concealed and cleared after 30 seconds. System AutoFill's optional
-  suggestion list stores a website, a username and an item reference, never a
-  secret, and is off until you turn it on (see [SECURITY.md](SECURITY.md)).
+- **Secrets are never persisted or indexed.** The index holds only titles, URLs,
+  usernames and the presence of a password or one-time code, never the secret
+  values. Passwords and codes are read fresh from `pass-cli` at the moment you
+  copy them, handed to the pasteboard, and the pasteboard entry is marked
+  concealed and cleared after 30 seconds. The rows from the last read are kept
+  in a file sealed with a Keychain key bound to this Mac, so a launch has
+  something to show; notes and custom fields are not in it, and neither is any
+  secret. System AutoFill's optional suggestion list stores a website, a
+  username and an item reference, never a secret, and is off until you turn it
+  on (see [SECURITY.md](SECURITY.md)).
 - **Authentication lives in `pass-cli`.** The app holds no Proton credentials and
   relies on the CLI's existing session.
 - **The trust boundary is that session.** Anyone who can run code as your user
   can already read everything through `pass-cli` directly, so the app is careful
-  not to be a weaker link: nothing is written to disk unless you turn on the
-  AutoFill suggestion list, and signed release builds use the hardened runtime
-  without `get-task-allow` so other processes can't attach.
+  not to be a weaker link: what reaches the disk is non-secret metadata, sealed
+  with a key that never leaves this Mac's Keychain, and signed release builds use
+  the hardened runtime without `get-task-allow` so other processes can't attach.
 - An optional Touch ID lock guards casual access to an unlocked Mac. It is not a
   defense against local code execution.
 

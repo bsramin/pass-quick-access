@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- The panel and System AutoFill answer at launch. Reading the vaults is one
+  `pass-cli` run per vault, long enough that a fill right after login sat
+  through a spinner for something the previous launch had already read. The rows
+  from the last complete read are now kept in
+  `~/Library/Application Support/PassQuickAccess/index.sealed`, sealed with
+  AES-256-GCM under a 32-byte key held in the Keychain for this Mac only, and
+  the vaults are re-read in the background on the usual freshness window. The
+  file holds what a row shows and matches on, never a password or a one-time
+  code, and not the item's note or custom fields either: those are searched from
+  memory and are back once the first refresh lands. It is `0600` in a `0700`
+  directory, excluded from backups, and removed when the session goes. A file
+  that cannot be opened reads as no cache at all, so the worst a bad one costs
+  is the cold start it was meant to save.
+
 ## v2026-09-25.1
 
 ### Fixed

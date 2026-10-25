@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2026-10-25.1
 
 ### Added
 - The panel and System AutoFill answer at launch. Reading the vaults is one

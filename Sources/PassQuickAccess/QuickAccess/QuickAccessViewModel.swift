@@ -101,9 +101,16 @@ final class QuickAccessViewModel: ObservableObject {
     /// parallel drops the session), so this tells the user the wait is the vaults
     /// indexing, not a hang.
     @Published private(set) var loadingDetail: String?
-    /// True while vaults are still streaming in, so the footer can show progress
-    /// even though usable results are already on screen.
+    /// True whenever a pass over the vaults is running, including a refresh
+    /// behind a list that is already up. It drives the spinner in the search
+    /// field and nothing else.
     @Published private(set) var isIndexing = false
+    /// True while the rows on screen are still arriving, so the footer can show
+    /// progress in place of the keyboard hints and an empty result can say it is
+    /// still looking. A refresh leaves it false: the list behind it is complete,
+    /// and taking the hints away for the length of a read of every vault would
+    /// cost them exactly when they are being used.
+    @Published private(set) var isBuildingList = false
     /// True while waiting for a sign-in to land after the user was sent to log in.
     @Published private(set) var isRecovering = false
     /// Whether a stored access token offers a one-tap reconnect from signed-out.
@@ -462,6 +469,8 @@ final class QuickAccessViewModel: ObservableObject {
     /// Streams the vaults into the index, showing each as it arrives. Returns how
     /// it ended so `reload` can decide whether to retry or surface a failure.
     private func runIndexPass() async -> IndexOutcome {
+        isBuildingList = true
+        defer { isBuildingList = false }
         var accumulated: [ItemSummary] = []
         do {
             for try await vault in client.indexLoginItems() {

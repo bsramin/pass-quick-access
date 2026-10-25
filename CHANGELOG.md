@@ -17,6 +17,16 @@
   that cannot be opened reads as no cache at all, so the worst a bad one costs
   is the cold start it was meant to save.
 
+### Changed
+- The list footer keeps its keyboard hints while the index is refreshing. The
+  hints only ever made way for progress because the first pass over the vaults
+  shows rows as they arrive, where a missing item may just not have landed yet.
+  A refresh runs behind a list that is already complete and lasts as long as a
+  read of every vault, so it took the hints away at exactly the moment they were
+  being used. The spinner in the search field still marks it. For the same
+  reason a query with no match now says so during a refresh, instead of showing
+  the loader as though the list were incomplete.
+
 ## v2026-09-25.1
 
 ### Fixed

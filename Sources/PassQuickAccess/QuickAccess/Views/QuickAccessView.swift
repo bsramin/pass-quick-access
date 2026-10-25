@@ -137,8 +137,8 @@ struct QuickAccessView: View {
                 .focused($searchFocused)
             if viewModel.isIndexing {
                 // A spinner right in the field, so while you're typing you can see
-                // the index is still filling in and a missing item may just not
-                // have loaded yet, even if the footer hint is out of your eyeline.
+                // the vaults are still being read. During a refresh it is the only
+                // sign of it, since the footer keeps the shortcuts.
                 ProgressView()
                     .controlSize(.small)
                     .help("Still indexing your vaults")
@@ -162,10 +162,11 @@ struct QuickAccessView: View {
             centered { statusText(message, systemImage: "exclamationmark.triangle") }
         } else if !viewModel.results.isEmpty {
             resultsList
-        } else if viewModel.isIndexing {
+        } else if viewModel.isBuildingList {
             // Still streaming vaults in: a query with no match yet might just be in
             // a vault that hasn't arrived. Keep the loader so it doesn't read as
-            // "not found" before the index is complete.
+            // "not found" before the index is complete. A refresh behind a complete
+            // list is a different matter: there "No matches" is the honest answer.
             centered { loading }
         } else if viewModel.loadState == .ready {
             centered { statusText("No matches", systemImage: "magnifyingglass") }
@@ -220,7 +221,10 @@ struct QuickAccessView: View {
 
     private var listFooter: some View {
         footerBar {
-            if viewModel.isIndexing {
+            // Only while the rows are still arriving. A refresh runs behind a list
+            // that is already complete and lasts as long as a read of every vault,
+            // which is exactly when the shortcuts are being used.
+            if viewModel.isBuildingList {
                 ProgressView().controlSize(.small).scaleEffect(0.6)
                 Text(viewModel.loadingDetail ?? "Indexing…")
                     .font(.system(size: 11, weight: .semibold))

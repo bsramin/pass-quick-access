@@ -38,6 +38,16 @@ actor PassCLIClient {
         self.fieldTimeout = fieldTimeout
     }
 
+    /// What `pass-cli --version` prints, or nil when it cannot be asked. Used
+    /// once at launch to tell the user their CLI is older than this app drives;
+    /// nothing else depends on it, so a failure here is silence, not an error.
+    func versionBanner() async -> String? {
+        guard let result = try? await execute(["--version"], timeout: .seconds(5)) else { return nil }
+        let banner = String(decoding: result.stdout, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return banner.isEmpty ? nil : banner
+    }
+
     /// Verifies the stored session can reach the server. Throws a
     /// `PassCLIError` whose `isAuthenticationFailure` flags a re-login.
     ///

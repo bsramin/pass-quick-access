@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let client = PassCLIClient(executable: executable)
+        warnIfCLIIsTooOld(client)
         let reconnector = PATReconnector(client: client)
         self.reconnector = reconnector
 
@@ -254,6 +255,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindowController = controller
         NSApp.activate(ignoringOtherApps: true)
         controller.showWindow(nil)
+    }
+
+    /// One `--version` run at launch. The app follows a single `pass-cli`
+    /// rather than branching on versions, so an older one is named and sent off
+    /// to update rather than worked around. Off the launch path: the panel and
+    /// the index carry on while this runs, and an old CLI fails on its own
+    /// terms if the user dismisses the prompt.
+    private func warnIfCLIIsTooOld(_ client: PassCLIClient) {
+        Task {
+            guard let banner = await client.versionBanner(), PassCLIVersion.isTooOld(banner) else { return }
+            presentOutdatedCLI(found: PassCLIVersion(banner))
+        }
+    }
+
+    private func presentOutdatedCLI(found: PassCLIVersion?) {
+        let alert = NSAlert()
+        alert.messageText = "Proton Pass CLI \(PassCLIVersion.minimum) or newer is needed"
+        let installed = found.map { "Version \($0) is installed." } ?? "An older version is installed."
+        alert.informativeText = "\(installed) Update pass-cli, then relaunch Pass Quick Access."
+        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Later")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        NSWorkspace.shared.open(PassCLIVersion.downloadPage)
     }
 
     private func presentMissingCLI() {

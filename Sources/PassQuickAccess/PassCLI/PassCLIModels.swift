@@ -2,8 +2,11 @@
 
 import Foundation
 
-// JSON shapes track `pass-cli` 2.1.2 (`--output json`). Refresh them when the
-// CLI changes its output.
+// JSON shapes track `pass-cli` 2.5.1 (`--output json`); anything older than
+// `PassCLIVersion.minimum` is sent off to update instead. Unknown keys are
+// ignored, so a field added upstream costs nothing here; `PassCLIShapeTests`
+// holds the full shape of a real `item list` and fails when one is renamed or
+// removed.
 
 struct VaultList: Decodable, Sendable {
     let vaults: [Vault]

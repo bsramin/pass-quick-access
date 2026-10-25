@@ -213,6 +213,24 @@ final class PassCLIClientTests: XCTestCase {
         let peak = await counter.peak
         XCTAssertEqual(peak, 1, "the session lock must let only one holder run at a time")
     }
+
+    func testReadsTheVersionTheCLIReports() async {
+        let runner = FakeProcessRunner(stdout: "Proton Pass CLI 2.5.1 (84186e7)\n")
+        let client = PassCLIClient(executable: executable, runner: runner)
+
+        let banner = await client.versionBanner()
+
+        XCTAssertEqual(banner, "Proton Pass CLI 2.5.1 (84186e7)")
+    }
+
+    func testTheVersionIsAskedForWithNothingElse() async {
+        let runner = CapturingRunner()
+
+        _ = await PassCLIClient(executable: executable, runner: runner).versionBanner()
+
+        XCTAssertEqual(runner.arguments, ["--version"])
+    }
+
 }
 
 /// Tracks how many tasks hold a resource at once, so a test can prove the lock

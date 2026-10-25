@@ -18,6 +18,15 @@
   is the cold start it was meant to save.
 
 ### Changed
+- pass-cli 2.5 is now the oldest release the app drives. 2.5.0 removed logging
+  in with credentials and added `autofill_urls` to an item's content, and
+  carrying a path for each older release means testing against a tool that is
+  not mine. The app reads `pass-cli --version` at launch and, when it finds
+  something older, offers the download page once instead of failing later in a
+  command. A version line it cannot parse is left alone and allowed to run.
+  Nothing else changes for 2.5.1: the three fields it added to `item list` are
+  ignored, and `vault list`, `item totp` and `item view` are byte for byte what
+  2.4.1 printed.
 - The list footer keeps its keyboard hints while the index is refreshing. The
   hints only ever made way for progress because the first pass over the vaults
   shows rows as they arrive, where a missing item may just not have landed yet.

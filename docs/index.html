@@ -379,6 +379,11 @@ footer{padding:50px 0 38px}
         <p>The same substring, diacritic-insensitive, multi-word matching as the official client, across titles, usernames, emails, URLs, notes and custom fields. Ranked by relevance, so a hit in the title comes before one buried in a URL or note.</p>
       </div>
       <div class="card">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></div>
+        <h3>Ready when you are</h3>
+        <p>The rows from the last read are kept in a file sealed with a key that never leaves this Mac's Keychain, so the panel and System AutoFill answer straight away instead of reading every vault first, and the vaults are re-read behind you. No secret is in that file, and neither are notes or custom fields.</p>
+      </div>
+      <div class="card">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7.5 14h9"/></svg></div>
         <h3>Fill or copy</h3>
         <p>Type the login straight into the app you came from, in any browser, or copy the username, password or one-time code. Each shown only when the item has it; choose fill, copy, or both. Or let macOS ask the app instead, through <a href="#autofill">System AutoFill</a>.</p>
@@ -425,10 +430,10 @@ footer{padding:50px 0 38px}
       <p>The app never reimplements Proton's crypto or auth. It drives the official, Proton-maintained <a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> and is careful never to be the weaker link.</p>
     </div>
     <div class="shield-list reveal">
-      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Secrets are never persisted or indexed</b><p>The in-memory index holds only titles, URLs, usernames and whether a password or code exists, never the values. AutoFill&rsquo;s optional suggestion list saves a website, a username and an item reference, never a secret, and is off until you turn it on.</p></div></div>
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Secrets are never persisted or indexed</b><p>The index holds only titles, URLs, usernames and whether a password or code exists, never the values. Its rows are kept between launches in a file sealed with a Keychain key bound to this Mac, without notes, custom fields or any secret. AutoFill&rsquo;s optional suggestion list saves a website, a username and an item reference, never a secret, and is off until you turn it on.</p></div></div>
       <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Read fresh, cleared fast</b><p>Passwords and codes are read from pass-cli at the moment you copy, marked concealed on the pasteboard, and cleared after 30 seconds.</p></div></div>
       <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Authentication lives in pass-cli</b><p>The app holds no Proton credentials and relies entirely on the CLI's existing session.</p></div></div>
-      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Hardened runtime</b><p>Signed release builds use the hardened runtime without <span class="mono">get-task-allow</span>, so other processes can't attach. Nothing is written to disk unless you turn on the AutoFill suggestion list.</p></div></div>
+      <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Hardened runtime</b><p>Signed release builds use the hardened runtime without <span class="mono">get-task-allow</span>, so other processes can't attach. What reaches the disk is non-secret metadata, sealed with a key that never leaves this Mac's Keychain.</p></div></div>
       <div class="shield"><span class="chk"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4 10-10"/></svg></span><div><b>Updates you trigger, verified before they install</b><p>It checks one static file (the <a class="mono" style="color:var(--accent)" href="appcast.xml">appcast</a> on GitHub Pages) at launch and every two hours, with no account data, just a fetch you'll see on the network. New versions never install on their own: you click Update, and each download is checked against a pinned EdDSA key first.</p></div></div>
     </div>
   </div>
@@ -464,7 +469,7 @@ footer{padding:50px 0 38px}
       <div class="card span2">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
         <h3>Your logins named in the menu, if you ask</h3>
-        <p>For a row to carry your username before you&rsquo;ve picked this app, macOS needs a list of them. That&rsquo;s off by default and has its own switch, because it is the one thing in the app that writes outside its own memory: turning it on saves each login&rsquo;s website and username, never a password or a code, into the password database macOS manages. Off, AutoFill still works; you pick Pass Quick Access and search.</p>
+        <p>For a row to carry your username before you&rsquo;ve picked this app, macOS needs a list of them. That&rsquo;s off by default and has its own switch, because it is the one thing the app writes outside its own storage: turning it on saves each login&rsquo;s website and username, never a password or a code, into the password database macOS manages. Off, AutoFill still works; you pick Pass Quick Access and search.</p>
       </div>
     </div>
     <div class="setup reveal">
@@ -559,7 +564,7 @@ footer{padding:50px 0 38px}
     </div>
     <div class="get-grid">
       <div class="reveal">
-        <p style="color:var(--ink-soft);font-size:16px;margin:0 0 18px">Grab the latest pre-built app, or build it from source. Either way you'll need macOS 14+ and <a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> installed and logged in.</p>
+        <p style="color:var(--ink-soft);font-size:16px;margin:0 0 18px">Grab the latest pre-built app, or build it from source. Either way you'll need macOS 14+ and <a class="mono" style="color:var(--accent)" href="https://github.com/protonpass/pass-cli" target="_blank" rel="noopener">pass-cli</a> 2.5 or later, installed and logged in.</p>
         <a class="btn btn-primary" href="https://github.com/bsramin/pass-quick-access/releases/latest" target="_blank" rel="noopener">Download for macOS
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg>
         </a>

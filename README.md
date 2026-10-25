@@ -77,7 +77,9 @@ provider macOS loads when something asks for a password. Only the app ever runs
 - **Ready at launch.** The rows from the last read are kept in an encrypted file,
   so the panel and System AutoFill answer straight away instead of waiting for a
   `pass-cli` run per vault, and the vaults are re-read behind you. No secret is
-  in that file, and neither are notes or custom fields.
+  in that file, and neither are notes or custom fields. With the Touch ID lock
+  on, nothing is read until you unlock: the rows are then there the moment the
+  panel opens, rather than at launch.
 - **Floating search panel** summoned by a global hotkey (default ⌥⇧Space,
   configurable). It opens over any app without pulling you out of it, and
   dismisses when it loses focus.
@@ -289,8 +291,11 @@ You'll also need `pass-cli` installed and logged in (see Requirements).
 ## Requirements
 
 - macOS 14 or later
-- [`pass-cli`](https://github.com/protonpass/pass-cli) installed and logged in
-  (`pass-cli login`). The CLI requires a paid Proton Pass plan.
+- [`pass-cli`](https://github.com/protonpass/pass-cli) 2.5 or later, installed
+  and logged in (`pass-cli login`). The CLI requires a paid Proton Pass plan.
+  The app checks the version at launch and points you at the download page when
+  it finds an older one: it tracks one CLI rather than carrying a path for each
+  release, and 2.5.0 is where logging in with credentials went away.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen), to build from source
 
 ## Build and run

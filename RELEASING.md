@@ -205,7 +205,7 @@ Nothing here is secret: a Team ID appears in every signed binary. But it is
 *specific*, so a fork that wants a working AutoFill extension has to substitute
 its own. Three places name `Y3T76BW4DZ` or `it.ramin.…`:
 
-- `project.yml` — `bundleIdPrefix` and the two `PRODUCT_BUNDLE_IDENTIFIER`s.
+- `project.yml`: `bundleIdPrefix` and the two `PRODUCT_BUNDLE_IDENTIFIER`s.
 - `Sources/PassQuickAccess/App/PassQuickAccess-Distribution.entitlements`
 - `Sources/PassQuickAccessAutoFill/PassQuickAccessAutoFill-Distribution.entitlements`
 
@@ -217,7 +217,7 @@ extension.
 
 Only the `-Distribution` files carry any of this. Building from source without a
 Developer ID identity uses the plain entitlements, which name no team and claim
-no provisioned capability, so a contributor needs none of the above — they just
+no provisioned capability, so a contributor needs none of the above. They just
 get an app whose AutoFill extension the system will not offer.
 
 ## Entitlements

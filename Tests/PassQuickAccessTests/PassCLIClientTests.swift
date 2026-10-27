@@ -108,18 +108,21 @@ final class PassCLIClientTests: XCTestCase {
         XCTAssertEqual(String(describing: code), "••••••")
     }
 
-    func testUserFacingReadsGiveUpSoonerThanTheIndex() async throws {
-        // A password or a code is read with the panel open and the user waiting on
-        // it, so it must not sit on the deadline an index is worth.
+    func testEachKindOfCommandWaitsAsLongAsItIsWorth() async throws {
+        // Three deadlines, split by who is waiting. A field read happens with
+        // the panel open and the user on a keystroke. A vault listing runs in
+        // the background and grows with the account: 1,357 items measured 5s to
+        // 15s+ run to run. Everything else is fixed, small work.
         let runner = TimeoutRecordingRunner()
-        let client = PassCLIClient(executable: executable, runner: runner, timeout: .seconds(15), fieldTimeout: .seconds(8))
+        let client = PassCLIClient(executable: executable, runner: runner)
         let item = ItemReference(shareID: "s1", itemID: "i1")
 
         _ = try await client.password(for: item)
         _ = try await client.totp(for: item)
+        _ = try await client.loginItems(in: Vault(name: "Personal", vaultID: "v1", shareID: "s1"))
         _ = try await client.vaults()
 
-        XCTAssertEqual(runner.timeouts, [.seconds(8), .seconds(8), .seconds(15)])
+        XCTAssertEqual(runner.timeouts, [.seconds(8), .seconds(8), .seconds(180), .seconds(15)])
     }
 
     func testEmptyFieldThrows() async throws {
@@ -309,6 +312,8 @@ private final class TimeoutRecordingRunner: ProcessRunning, @unchecked Sendable 
             stdout = #"{"vaults": [{"name": "Personal", "vault_id": "v1", "share_id": "s1"}]}"#
         } else if arguments.contains("totp") {
             stdout = #"{"totp_uri": "281898", "totp": "281898"}"#
+        } else if arguments.contains("list") {
+            stdout = #"{"items": []}"#
         } else {
             stdout = "hunter2"
         }

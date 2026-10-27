@@ -17,6 +17,10 @@ actor PassCLIClient {
     /// a password the user asked for a moment ago is better answered with "try
     /// again" than with fifteen seconds of nothing.
     private let fieldTimeout: Duration
+    /// The deadline for `item list`, the only command whose work grows with the
+    /// account. A 1,357-item vault measured 5s to 15s+ run to run, so the
+    /// ordinary deadline failed the index on the slow ones.
+    private let listTimeout: Duration
     private let decoder = JSONDecoder()
 
     /// Gate that lets only one `pass-cli` process run at a time. The actor alone
@@ -30,12 +34,14 @@ actor PassCLIClient {
         executable: URL,
         runner: ProcessRunning = SystemProcessRunner(),
         timeout: Duration = .seconds(15),
-        fieldTimeout: Duration = .seconds(8)
+        fieldTimeout: Duration = .seconds(8),
+        listTimeout: Duration = .seconds(180)
     ) {
         self.executable = executable
         self.runner = runner
         self.timeout = timeout
         self.fieldTimeout = fieldTimeout
+        self.listTimeout = listTimeout
     }
 
     /// What `pass-cli --version` prints, or nil when it cannot be asked. Used
@@ -147,7 +153,7 @@ actor PassCLIClient {
             "--filter-state", "active",
             "--show-secrets",
             "--output", "json",
-        ])
+        ], timeout: listTimeout)
         return response.items.compactMap { ItemSummary($0, vault: vault) }
     }
 

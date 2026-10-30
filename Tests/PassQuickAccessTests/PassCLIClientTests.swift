@@ -111,8 +111,8 @@ final class PassCLIClientTests: XCTestCase {
     func testEachKindOfCommandWaitsAsLongAsItIsWorth() async throws {
         // Three deadlines, split by who is waiting. A field read happens with
         // the panel open and the user on a keystroke. A vault listing runs in
-        // the background and grows with the account: 1,357 items measured 5s to
-        // 15s+ run to run. Everything else is fixed, small work.
+        // the background, grows with the account and varies run to run.
+        // Everything else is fixed, small work.
         let runner = TimeoutRecordingRunner()
         let client = PassCLIClient(executable: executable, runner: runner)
         let item = ItemReference(shareID: "s1", itemID: "i1")

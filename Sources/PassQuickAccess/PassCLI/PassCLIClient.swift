@@ -18,8 +18,8 @@ actor PassCLIClient {
     /// again" than with fifteen seconds of nothing.
     private let fieldTimeout: Duration
     /// The deadline for `item list`, the only command whose work grows with the
-    /// account. A 1,357-item vault measured 5s to 15s+ run to run, so the
-    /// ordinary deadline failed the index on the slow ones.
+    /// account, and the one that varies most from run to run. A large enough
+    /// vault overran the ordinary deadline and failed the whole index.
     private let listTimeout: Duration
     private let decoder = JSONDecoder()
 

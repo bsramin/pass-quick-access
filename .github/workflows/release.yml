@@ -29,7 +29,14 @@ env:
   SPARKLE_SHA256: "74a07da821f92b79310009954c0e15f350173374a3abe39095b4fc5096916be6"
 
 jobs:
+  test:
+    # The release used to go out whatever CI said, the two being separate
+    # pipelines, so a tag could be signed and published while the suite had
+    # been failing for days. It cannot now.
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: test
     # Build against the latest SDK so the shipped app gets the current UI look.
     runs-on: macos-26
     steps:

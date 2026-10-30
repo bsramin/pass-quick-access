@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # So the release workflow can run this same job before it builds anything,
+  # rather than keeping a second copy of it that drifts.
+  workflow_call:
 
 jobs:
   test:

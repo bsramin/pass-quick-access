@@ -25,6 +25,10 @@ the build, attaches `PassQuickAccess.zip` to that same Release, signs it with th
 Sparkle EdDSA key, and publishes the new version to `docs/appcast.xml` (served by
 GitHub Pages). The release notes you wrote become the changelog the app shows.
 
+The workflow runs the test suite first and builds nothing if it fails, so a red
+CI stops a release instead of letting one go out beside it. It is the CI job
+itself, called rather than copied, so the two cannot drift apart.
+
 The job refuses to run if the signing or notarization secrets are missing, rather
 than quietly publishing an ad-hoc build that every user would have to right-click
 past.

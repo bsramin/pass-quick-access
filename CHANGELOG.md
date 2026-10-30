@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## v2026-10-30.1
 
 ### Fixed
 - Reading a large vault no longer gives up after fifteen seconds. Every

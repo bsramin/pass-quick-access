@@ -5,12 +5,11 @@
 ### Fixed
 - Reading a large vault no longer gives up after fifteen seconds. Every
   `pass-cli` command shared one deadline, and `item list` is the only one whose
-  work grows with the size of the account: a vault of 1,357 items took twelve
-  seconds on one run and over fifteen on the next, which turned the largest
-  vault into a failed index. Listing a vault now waits up to three minutes,
-  since it runs in the background behind a progress line. Reading a password or
-  a one-time code, where the panel is open and you are waiting on it, still
-  gives up after eight seconds.
+  work grows with the size of the account, so past a certain point a vault ran
+  out of time and came back as a failed index. Listing a vault now waits up to
+  three minutes, since it runs in the background behind a progress line.
+  Reading a password or a one-time code, where the panel is open and you are
+  waiting on it, still gives up after eight seconds.
 
 ## v2026-10-25.1
 

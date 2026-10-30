@@ -9,13 +9,12 @@ import XCTest
 final class IndexRestoreTests: XCTestCase {
     private let executable = URL(fileURLWithPath: "/usr/bin/true")
     private let key = Data(repeating: 0x5A, count: 32)
-    private var directory = URL(fileURLWithPath: "/dev/null")
-
-    override func setUpWithError() throws {
-        try super.setUpWithError()
-        directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("index-restore-tests-\(UUID().uuidString)", isDirectory: true)
-    }
+    /// A `let` rather than something `setUp` fills in: `setUp` and `tearDown`
+    /// are nonisolated, and a main-actor class lets them reach only immutable
+    /// Sendable storage. XCTest builds one instance per test, so each still
+    /// gets a directory of its own.
+    private let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("index-restore-tests-\(UUID().uuidString)", isDirectory: true)
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: directory)

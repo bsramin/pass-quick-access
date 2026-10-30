@@ -3,6 +3,24 @@
   <channel>
     <title>Pass Quick Access</title>
     <item>
+      <title>v2026-10-30.1</title>
+      <pubDate>Fri, 30 Oct 2026 09:19:39 +0000</pubDate>
+      <sparkle:version>20261030.1</sparkle:version>
+      <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>### Fixed
+- Reading a large vault no longer gives up after fifteen seconds. Every
+  `pass-cli` command shared one deadline, and `item list` is the only one whose
+  work grows with the size of the account: a vault of 1,357 items took twelve
+  seconds on one run and over fifteen on the next, which turned the largest
+  vault into a failed index. Listing a vault now waits up to three minutes,
+  since it runs in the background behind a progress line. Reading a password or
+  a one-time code, where the panel is open and you are waiting on it, still
+  gives up after eight seconds.
+</description>
+      <enclosure url="https://github.com/bsramin/pass-quick-access/releases/download/v2026-10-30.1/PassQuickAccess.zip" sparkle:edSignature="C2TlceOf6hrmkojEIgQrWvOWnGPhedHN0yDj3MBCuCVUFFlBT+ScOUGxEFhvEMkXEHHRJ5KMl4h44qvPCCArBw==" length="5214532" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v2026-10-25.1</title>
       <pubDate>Sun, 25 Oct 2026 13:57:35 +0000</pubDate>
       <sparkle:version>20261025.1</sparkle:version>
